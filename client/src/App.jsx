@@ -1,21 +1,41 @@
 import React, { useState, useEffect } from "react";
+// ... (Giữ các import cũ)
 import POSView from "./components/POSView";
-import KitchenView from "./components/KitchenView"; // <--- Import Kitchen
+import KitchenView from "./components/KitchenView";
 import LoginPage from "./components/LoginPage";
-import RegisterPage from "./components/RegisterPage"; // <--- Import Register
+import RegisterPage from "./components/RegisterPage"; 
 import AdminDashboard from "./components/AdminDashboard";
 import HomePage from "./components/HomePage";
+import MenuPage from "./components/MenuPage";
+import ProfilePage from "./components/ProfilePage"; 
+import MainLayout from "./components/MainLayout";
+import CustomerOrderHistory from './components/CustomerOrderHistory';
+import BookingModal from './components/BookingModal';
+
+// --- IMPORT MỚI ---
+import AboutPage from "./components/AboutPage";
+import ContactPage from "./components/ContactPage";
 
 function App() {
   const [user, setUser] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
-  const [showRegister, setShowRegister] = useState(false); // State cho form đăng ký
+  const [showRegister, setShowRegister] = useState(false); 
+  
+  // State điều hướng
+  const [isOrdering, setIsOrdering] = useState(false);  
+  const [showMenuPage, setShowMenuPage] = useState(false); 
+  const [showProfilePage, setShowProfilePage] = useState(false);
+  // --- STATE MỚI ---
+  const [showAboutPage, setShowAboutPage] = useState(false);
+  const [showContactPage, setShowContactPage] = useState(false);
+  
+  const [searchText, setSearchText] = useState(''); 
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem("fastfood_user");
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    if (savedUser) setUser(JSON.parse(savedUser));
   }, []);
 
   const handleLoginSuccess = (userData) => {
@@ -24,67 +44,103 @@ function App() {
     setShowLogin(false);
   };
 
+  const resetNavigation = () => {
+      setIsOrdering(false);
+      setShowMenuPage(false);
+      setShowProfilePage(false);
+      setShowAboutPage(false);   // Reset
+      setShowContactPage(false); // Reset
+  };
+
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("fastfood_user");
     setShowLogin(false);
+    resetNavigation();
+    setSearchText(''); 
+  };
+
+  const handleSearch = (value) => {
+      setSearchText(value);
+      if (value && !showMenuPage) {
+          resetNavigation();
+          setShowMenuPage(true);
+      }
   };
 
   const renderView = () => {
+    // --- PHẦN LAYOUT CHO KHÁCH ---
+    const CustomerLayoutContent = (
+        <MainLayout
+            user={user}
+            onLogin={() => user ? {} : setShowLogin(true)} 
+            onLogout={handleLogout}
+            
+            // CÁC HÀM ĐIỀU HƯỚNG
+            onGoHome={() => { resetNavigation(); setSearchText(''); }}
+            onGoToMenu={() => { resetNavigation(); setShowMenuPage(true); }}
+            onGoToProfile={() => { 
+                if(!user) setShowLogin(true); 
+                else { resetNavigation(); setShowProfilePage(true); } 
+            }}
+            onGoToAbout={() => { resetNavigation(); setShowAboutPage(true); }}     // <--- Hàm mới
+            onGoToContact={() => { resetNavigation(); setShowContactPage(true); }} // <--- Hàm mới
+            
+            onShowHistory={() => user ? setShowHistoryModal(true) : setShowLogin(true)}
+            onShowBooking={() => setShowBookingModal(true)}
+            
+            searchText={searchText}
+            onSearch={handleSearch} 
+        >
+            {/* LOGIC HIỂN THỊ NỘI DUNG */}
+            {showProfilePage ? (
+                <ProfilePage user={user} onUserUpdated={(updatedUser) => { setUser(updatedUser); localStorage.setItem("fastfood_user", JSON.stringify(updatedUser)); }} />
+            ) : showAboutPage ? (
+                <AboutPage onGoToMenu={() => { resetNavigation(); setShowMenuPage(true); }} /> 
+            ) : showContactPage ? (
+                <ContactPage />
+            ) : showMenuPage ? (
+                <MenuPage 
+                    user={user}
+                    onLogin={() => setShowLogin(true)}
+                    onOrder={() => setIsOrdering(true)}
+                    searchText={searchText} 
+                /> 
+            ) : (
+                <HomePage 
+                    onGoToMenu={() => { resetNavigation(); setShowMenuPage(true); }}
+                    onOrder={() => user ? setIsOrdering(true) : setShowLogin(true)}
+                    user={user}
+                />
+            )}
+        </MainLayout>
+    );
+
     if (user) {
         switch (user.role) {
           case "ADMIN": return <AdminDashboard onLogout={handleLogout} />;
-          case "KITCHEN": return <KitchenView />; // <--- Hiển thị Bếp
+          case "KITCHEN": return <KitchenView onLogout={handleLogout} />; 
           case "CASHIER": return <POSView />;
           case "CUSTOMER": 
           case "GUEST": 
-            // Nếu là khách -> Vẫn hiện trang chủ, nhưng HomePage sẽ tự nhận diện user để hiện nút Lịch sử
-            return <HomePage onLogin={() => {}} />; 
+            if (isOrdering) return <POSView isCustomer={true} />;
+            return CustomerLayoutContent;
           default: return <div className="text-center mt-5">Vai trò không hợp lệ!</div>;
         }
     }
 
-    if (showRegister) {
-        return <RegisterPage onSwitchToLogin={() => { setShowRegister(false); setShowLogin(true); }} />;
-    }
+    // Chưa đăng nhập
+    if (showRegister) return <RegisterPage onSwitchToLogin={() => { setShowRegister(false); setShowLogin(true); }} />;
+    if (showLogin) return <LoginPage onLogin={handleLoginSuccess} onGuest={() => { setUser({ role: "GUEST", fullName: "Khách" }); setShowLogin(false); }} onSwitchToRegister={() => { setShowLogin(false); setShowRegister(true); }} />;
 
-    if (showLogin) {
-        return <LoginPage 
-            onLogin={handleLoginSuccess} 
-            onGuest={() => { setUser({ role: "GUEST", fullName: "Khách" }); setShowLogin(false); }}
-            // Bạn cần sửa thêm LoginPage để có nút "Chưa có tài khoản? Đăng ký" gọi prop này
-            onSwitchToRegister={() => { setShowLogin(false); setShowRegister(true); }} 
-        />;
-    }
-
-    return <HomePage onLogin={() => setShowLogin(true)} />;
+    return CustomerLayoutContent; // Trả về layout khách vãng lai
   };
 
-  // Logic full màn hình cho Admin và Kitchen
-  const isFullPage = (user && (user.role === 'ADMIN' || user.role === 'KITCHEN')) || (!user && !showLogin && !showRegister);
-
-  if (isFullPage) {
-      return renderView();
-  }
-
   return (
-    <div className="container-fluid py-3 bg-light min-vh-100">
-      {/* Chỉ hiện Navbar đơn giản nếu không phải Admin/Kitchen */}
-      {user && user.role !== 'ADMIN' && user.role !== 'KITCHEN' && user.role !== 'CUSTOMER' && (
-        <nav className="navbar navbar-light bg-white shadow-sm mb-4 px-4 rounded justify-content-between">
-          <div className="d-flex align-items-center">
-            <span className="navbar-brand fw-bold text-danger fs-3 me-3">🍔 FASTFOOD</span>
-            <span className="badge bg-secondary">
-              Xin chào, {user.fullName} ({user.role})
-            </span>
-          </div>
-          <button onClick={handleLogout} className="btn btn-outline-danger btn-sm">Đăng xuất 🚪</button>
-        </nav>
-      )}
-
-      <div className="px-2">
-        {renderView()}
-      </div>
+    <div className="container-fluid p-0 bg-light min-vh-100">
+      {renderView()}
+      <CustomerOrderHistory user={user} open={showHistoryModal} onCancel={() => setShowHistoryModal(false)} />
+      <BookingModal open={showBookingModal} onCancel={() => setShowBookingModal(false)} user={user} />
     </div>
   );
 }
