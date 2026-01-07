@@ -42,4 +42,13 @@ public class ReservationController {
     public List<Reservation> getAll() {
         return reservationRepository.findAll();
     }
+
+    @PutMapping("/{id}/status")
+    public Reservation updateStatus(@PathVariable Long id, @RequestParam String status) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt bàn!"));
+        
+        reservation.setStatus(status);
+        return reservationRepository.save(reservation);
+    }
 }

@@ -1,9 +1,10 @@
-import React from 'react';
-import { Layout, Button, Input, Space, Avatar, Dropdown } from 'antd';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Layout, Button, Input, Space, Avatar, Dropdown, message } from 'antd'; // Bỏ import Menu vì không dùng trực tiếp nữa
 import { 
-    ShoppingCartOutlined, SearchOutlined, UserOutlined, 
+    SearchOutlined, UserOutlined, 
     LogoutOutlined, LoginOutlined, HistoryOutlined, HomeOutlined,
-    ProfileOutlined, InfoCircleOutlined, PhoneOutlined // Thêm icon nếu cần
+    ProfileOutlined, ShopOutlined, DownOutlined
 } from '@ant-design/icons';
 
 const { Header } = Layout;
@@ -19,13 +20,53 @@ const CustomerHeader = ({
     searchText, 
     onSearch, 
     onGoToProfile,
-    onGoToAbout, onGoToContact
+    onGoToAbout, 
+    onGoToContact
 }) => {
+    // --- STATE CHO CHI NHÁNH ---
+    const [branches, setBranches] = useState([]);
+    const [selectedBranch, setSelectedBranch] = useState(null);
 
-    // Hàm cuộn xuống chân trang (Liên hệ)
-    const scrollToFooter = () => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    // --- LOAD DANH SÁCH CHI NHÁNH ---
+    useEffect(() => {
+        const fetchBranches = async () => {
+            try {
+                const res = await axios.get('http://localhost:8081/api/branches');
+                // Lọc chi nhánh đang hoạt động
+                const activeBranches = res.data ? res.data.filter(b => b.active) : [];
+                setBranches(activeBranches);
+
+                // Logic chọn chi nhánh mặc định
+                const savedBranchId = localStorage.getItem('selectedBranchId');
+                if (savedBranchId) {
+                    const savedBranch = activeBranches.find(b => b.id === parseInt(savedBranchId));
+                    if (savedBranch) setSelectedBranch(savedBranch);
+                    else if (activeBranches.length > 0) setSelectedBranch(activeBranches[0]);
+                } else if (activeBranches.length > 0) {
+                    setSelectedBranch(activeBranches[0]);
+                }
+            } catch (error) {
+                console.error("Lỗi tải chi nhánh:", error);
+            }
+        };
+        fetchBranches();
+    }, []);
+
+    // Hàm xử lý chọn chi nhánh
+    const handleSelectBranch = (branch) => {
+        setSelectedBranch(branch);
+        localStorage.setItem('selectedBranchId', branch.id);
+        message.success(`Đã chuyển sang: ${branch.name}`);
+        // window.location.reload(); // Bỏ comment nếu muốn tải lại trang
     };
+
+    // --- SỬA LỖI Ở ĐÂY: TẠO MENU ITEMS CHUẨN ANT DESIGN V5 ---
+    const branchItems = branches.map(branch => ({
+        key: String(branch.id),
+        label: branch.name,
+        icon: <ShopOutlined />,
+        onClick: () => handleSelectBranch(branch) // Gắn sự kiện click vào từng item
+    }));
 
     const userMenuItems = [
         {
@@ -60,15 +101,31 @@ const CustomerHeader = ({
                 boxShadow: '0 2px 8px rgba(0,0,0,0.05)' 
             }}
         >
-            {/* 1. LOGO */}
-            <div 
-                style={{ fontSize: '22px', fontWeight: '800', color: '#cf1322', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '1px' }} 
-                onClick={onGoHome}
-            >
-                <HomeOutlined style={{ fontSize: '20px' }} /> TDP FOOD
+            {/* 1. LOGO & CHỌN CHI NHÁNH */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div 
+                    style={{ fontSize: '22px', fontWeight: '800', color: '#cf1322', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '1px' }} 
+                    onClick={onGoHome}
+                >
+                    <HomeOutlined style={{ fontSize: '20px' }} /> TDP FOOD
+                </div>
+
+                {/* --- SỬA LỖI Ở ĐÂY: DÙNG PROP MENU THAY VÌ OVERLAY --- */}
+                {branches.length > 0 && (
+                    <Dropdown 
+                        menu={{ items: branchItems }} // Dùng prop 'menu' + 'items'
+                        trigger={['click']}
+                    >
+                        <Button type="text" style={{ fontSize: '14px', fontWeight: 500, color: '#555', display: 'flex', alignItems: 'center' }}>
+                            <ShopOutlined style={{ color: '#cf1322' }} /> 
+                            {selectedBranch ? selectedBranch.name : 'Chọn chi nhánh'} 
+                            <DownOutlined style={{ fontSize: '12px', marginLeft: 5 }} />
+                        </Button>
+                    </Dropdown>
+                )}
             </div>
             
-            {/* 2. MENU GIỮA (Đã thêm Giới thiệu & Liên hệ) */}
+            {/* 2. MENU GIỮA */}
             <Space size={30} style={{ fontWeight: 600, fontSize: '15px' }} className="d-none d-lg-flex">
                 <span className="hover-text" onClick={onGoHome}>Trang chủ</span>
                 <span className="hover-text" onClick={onGoToMenu}>Thực đơn</span>
@@ -103,16 +160,6 @@ const CustomerHeader = ({
                 ) : (
                     <Button type="primary" ghost icon={<LoginOutlined />} onClick={onLogin} style={{ borderRadius: '20px', fontWeight: '600', height: '32px' }}>Đăng nhập</Button>
                 )}
-
-                <Button 
-                    type="primary" 
-                    shape="round" 
-                    icon={<ShoppingCartOutlined />} 
-                    onClick={onGoToMenu} 
-                    style={{ background: '#f5a623', borderColor: '#f5a623', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(245, 166, 35, 0.4)', height: '32px' }}
-                >
-                    ĐẶT MÓN
-                </Button>
             </Space>
         </Header>
     );

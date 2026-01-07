@@ -4,7 +4,7 @@ import com.example.fastfood.entity.*;
 import com.example.fastfood.repository.IngredientRepository;
 import com.example.fastfood.repository.OrderRepository;
 import com.example.fastfood.repository.ProductRepository;
-import com.example.fastfood.repository.UserRepository; // <--- Import UserRepo
+import com.example.fastfood.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,20 +33,26 @@ public class OrderController {
     private IngredientRepository ingredientRepository;
     
     @Autowired
-    private UserRepository userRepository; // <--- Inject UserRepository
+    private UserRepository userRepository;
 
-    // API Tạo đơn hàng mới
+    // 1. API Lấy tất cả đơn hàng (Dành cho Thu ngân & Bếp)
+    // Sửa lại: Sắp xếp theo ID giảm dần để đơn mới nhất lên đầu (An toàn hơn createdAt)
+    @GetMapping
+    public List<Order> getAllOrders() {
+        return orderRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
+    }
+
+    // 2. API Tạo đơn hàng mới
     @PostMapping
     @Transactional
     public ResponseEntity<?> createOrder(@RequestBody OrderRequest request) {
         Order order = new Order();
         
-        // --- LOGIC MỚI: LƯU USER NẾU CÓ ---
+        // Lưu User nếu có (Khách hàng đã đăng nhập)
         if (request.getUserId() != null) {
             User user = userRepository.findById(request.getUserId()).orElse(null);
             order.setUser(user);
         }
-        // ----------------------------------
 
         List<OrderItem> items = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
@@ -55,7 +61,7 @@ public class OrderController {
             Product product = productRepository.findById(itemRequest.getProductId())
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy món ăn!"));
             
-            // LOGIC TRỪ KHO
+            // LOGIC TRỪ KHO (Giữ nguyên)
             if (product.getIngredients() != null && !product.getIngredients().isEmpty()) {
                 for (ProductIngredient pi : product.getIngredients()) {
                     Ingredient warehouseItem = pi.getIngredient();
@@ -76,22 +82,31 @@ public class OrderController {
             orderItem.setOrder(order);
             
             items.add(orderItem);
+            
+            // Tính tổng tiền
             total = total.add(product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
         }
 
         order.setItems(items);
-        order.setTotalAmount(total);
+        order.setTotalAmount(total); // <--- TÊN TRƯỜNG LÀ totalAmount
+        order.setStatus("PENDING");  // <--- Mặc định trạng thái là Chờ xác nhận
         
+        // Nếu Entity có trường createdAt, hãy set ở đây (hoặc dùng @PrePersist trong Entity)
+        // order.setCreatedAt(new Date()); 
+
         Order savedOrder = orderRepository.save(order);
         return ResponseEntity.ok(savedOrder);
     }
 
-    // ... (Giữ nguyên các API getPending, updateStatus, stats, chart, all...)
+    // 3. API Lấy đơn hàng đang chờ (Dành cho Bếp)
     @GetMapping("/pending")
     public List<Order> getPendingOrders() {
-        return orderRepository.findAll().stream().filter(o -> !o.getStatus().equals("COMPLETED")).toList();
+        return orderRepository.findAll().stream()
+                .filter(o -> !o.getStatus().equals("COMPLETED") && !o.getStatus().equals("PAID") && !o.getStatus().equals("CANCELLED"))
+                .toList();
     }
     
+    // 4. API Cập nhật trạng thái đơn (Thu ngân bấm "Thu tiền", Bếp bấm "Xong")
     @PutMapping("/{id}/status")
     public Order updateStatus(@PathVariable Long id, @RequestParam String status) {
         Order order = orderRepository.findById(id).orElseThrow();
@@ -99,41 +114,44 @@ public class OrderController {
         return orderRepository.save(order);
     }
 
+    // 5. API Thống kê
     @GetMapping("/stats")
     public StatsResponse getStats() {
         BigDecimal revenue = orderRepository.sumTotalRevenue();
-        return new StatsResponse(revenue != null ? revenue : BigDecimal.ZERO, orderRepository.countCompletedOrders(), orderRepository.countPendingOrders());
+        return new StatsResponse(
+            revenue != null ? revenue : BigDecimal.ZERO, 
+            orderRepository.countCompletedOrders(), 
+            orderRepository.countPendingOrders()
+        );
     }
 
+    // 6. API Biểu đồ doanh thu
     @GetMapping("/revenue-chart")
     public List<Map<String, Object>> getRevenueChart() {
         List<Object[]> data = orderRepository.getRevenueLast7Days();
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Object[] row : data) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("date", row[0]);
-            map.put("revenue", row[1]);
-            result.add(map);
+        if (data != null) {
+            for (Object[] row : data) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("date", row[0]);
+                map.put("revenue", row[1]);
+                result.add(map);
+            }
         }
         return result;
     }
 
-    @GetMapping("/all")
-    public List<Order> getAllOrders() {
-        return orderRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
-    }
-
-    // API Lịch sử đơn hàng của tôi
+    // 7. API Lịch sử đơn hàng của tôi (Dành cho Khách hàng)
     @GetMapping("/my-orders/{userId}")
     public List<Order> getMyOrders(@PathVariable Long userId) {
-        // Bây giờ Order đã có User, lệnh này sẽ chạy đúng
+        // Lưu ý: Đảm bảo OrderRepository có method này
         return orderRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
     // --- DTO CLASSES ---
     @Data
     public static class OrderRequest {
-        private Long userId; // <--- THÊM TRƯỜNG NÀY ĐỂ NHẬN ID TỪ FRONTEND
+        private Long userId; 
         private List<CartItem> items;
     }
 
