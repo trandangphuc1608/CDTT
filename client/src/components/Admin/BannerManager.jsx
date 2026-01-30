@@ -11,7 +11,7 @@ const BannerManager = () => {
 
     const fetchBanners = async () => {
         try {
-            const res = await axios.get('http://localhost:8081/api/banners');
+            const res = await axios.get('/api/banners');
             setBanners(res.data);
         } catch (error) {
             message.error('Lỗi tải banner!');
@@ -25,10 +25,10 @@ const BannerManager = () => {
     const handleFinish = async (values) => {
         try {
             if (editingBanner) {
-                await axios.put(`http://localhost:8081/api/banners/${editingBanner.id}`, values);
+                await axios.put(`/api/banners/${editingBanner.id}`, values);
                 message.success('Cập nhật thành công!');
             } else {
-                await axios.post('http://localhost:8081/api/banners', values);
+                await axios.post('/api/banners', values);
                 message.success('Thêm banner mới thành công!');
             }
             fetchBanners();
@@ -42,7 +42,7 @@ const BannerManager = () => {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:8081/api/banners/${id}`);
+            await axios.delete(`/api/banners/${id}`);
             message.success('Đã xóa banner!');
             fetchBanners();
         } catch (error) {
@@ -107,7 +107,7 @@ const BannerManager = () => {
                         </Form.Item>
                         <Upload
                             name="file"
-                            action="http://localhost:8081/api/upload"
+                            action="/api/upload"
                             listType="picture"
                             maxCount={1}
                             onChange={(info) => {

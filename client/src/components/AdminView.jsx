@@ -11,14 +11,14 @@ const AdminView = () => {
   }, []);
 
   const loadData = () => {
-    axios.get("http://localhost:8081/api/products").then((res) => setProducts(res.data));
-    axios.get("http://localhost:8081/api/orders/stats").then((res) => setStats(res.data));
+    axios.get("/api/products").then((res) => setProducts(res.data));
+    axios.get("/api/orders/stats").then((res) => setStats(res.data));
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Bạn chắc chắn muốn xóa món này?")) {
       try {
-        await axios.delete(`http://localhost:8081/api/products/${id}`);
+        await axios.delete(`/api/products/${id}`);
         loadData();
       } catch (e) { alert("Không thể xóa món đang có trong đơn hàng cũ!"); }
     }
@@ -28,7 +28,7 @@ const AdminView = () => {
     e.preventDefault();
     const newProduct = { ...form, category: { id: 1 } }; 
     try {
-      await axios.post("http://localhost:8081/api/products", newProduct);
+      await axios.post("/api/products", newProduct);
       alert("Thêm món thành công!");
       setForm({ name: "", price: "", imageUrl: "", description: "" });
       loadData();

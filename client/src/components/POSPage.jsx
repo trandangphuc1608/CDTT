@@ -1,18 +1,18 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useReactToPrint } from 'react-to-print';
-import { Layout, Card, Row, Col, Button, Input, List, Typography, Modal, message, Segmented, Space, Avatar, Tag, Table, Tabs, Badge } from "antd";
+import { Layout, Card, Row, Col, Button, Input, Typography, Modal, message, Segmented, Space, Avatar, Tag, Table } from "antd";
 import { 
   ShoppingCartOutlined, DeleteOutlined, SearchOutlined, 
-  PrinterOutlined, PlusOutlined, MinusOutlined, GiftOutlined,
-  LogoutOutlined, UserOutlined, UnorderedListOutlined, CheckCircleOutlined, SyncOutlined
+  PrinterOutlined, PlusOutlined, MinusOutlined, 
+  LogoutOutlined, UserOutlined, UnorderedListOutlined, SyncOutlined
 } from "@ant-design/icons";
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
 
-// --- COMPONENT HÓA ĐƠN ---
-const InvoiceToPrint = React.forwardRef(({ cart, subTotal, discount, finalTotal, orderId, cashierName }, ref) => (
+// --- COMPONENT HÓA ĐƠN ĐỂ IN ---
+const InvoiceToPrint = React.forwardRef(({ cart, finalTotal, orderId, cashierName, orderDate }, ref) => (
   <div ref={ref} style={{ padding: '20px', width: '300px', margin: '0 auto', fontFamily: 'monospace' }}>
     <div style={{ textAlign: 'center', marginBottom: '10px' }}>
       <Title level={4} style={{ margin: 0 }}>FASTFOOD STORE</Title>
@@ -22,7 +22,7 @@ const InvoiceToPrint = React.forwardRef(({ cart, subTotal, discount, finalTotal,
     <div style={{ margin: '10px 0' }}>
       <Text strong>Hóa đơn: #{orderId}</Text><br/>
       <Text>Thu ngân: {cashierName}</Text><br/>
-      <Text>Ngày: {new Date().toLocaleString()}</Text>
+      <Text>Ngày: {orderDate ? new Date(orderDate).toLocaleString('vi-VN') : new Date().toLocaleString('vi-VN')}</Text>
     </div>
     <hr style={{ borderTop: '1px dashed #000' }} />
     <table style={{ width: '100%', fontSize: '12px' }}>
@@ -30,39 +30,41 @@ const InvoiceToPrint = React.forwardRef(({ cart, subTotal, discount, finalTotal,
         <tr><th style={{ textAlign: 'left' }}>Món</th><th style={{ textAlign: 'center' }}>SL</th><th style={{ textAlign: 'right' }}>Tiền</th></tr>
       </thead>
       <tbody>
-        {cart.map((item) => (
-          <tr key={item.id}>
-            <td style={{ textAlign: 'left' }}>{item.product?.name || item.name}</td>
-            <td style={{ textAlign: 'center' }}>{item.quantity || item.qty}</td>
-            <td style={{ textAlign: 'right' }}>{((item.product?.price || item.price) * (item.quantity || item.qty)).toLocaleString()}</td>
-          </tr>
-        ))}
+        {cart && cart.map((item, index) => {
+            const name = item.product ? item.product.name : (item.name || 'Món ăn');
+            const qty = item.quantity || item.qty || 0;
+            const price = item.product ? item.product.price : item.price || 0;
+            const total = price * qty;
+            return (
+                <tr key={index}>
+                    <td style={{ textAlign: 'left' }}>{name}</td>
+                    <td style={{ textAlign: 'center' }}>{qty}</td>
+                    <td style={{ textAlign: 'right' }}>{total.toLocaleString()}</td>
+                </tr>
+            );
+        })}
       </tbody>
     </table>
     <hr style={{ borderTop: '1px dashed #000' }} />
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-      <span>TỔNG:</span><span>{finalTotal.toLocaleString()} đ</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', marginTop: '5px' }}>
+      <span>TỔNG CỘNG:</span><span>{finalTotal ? Number(finalTotal).toLocaleString() : 0} đ</span>
+    </div>
+    <div style={{ textAlign: 'center', marginTop: '20px', fontStyle: 'italic' }}>
+      <Text style={{ fontSize: '12px' }}>Cảm ơn quý khách & Hẹn gặp lại!</Text>
     </div>
   </div>
 ));
 
 const POSPage = () => {
-    // --- STATE CHUNG ---
-    const [activeTab, setActiveTab] = useState('pos'); // 'pos': Bán hàng, 'orders': Quản lý đơn
+    const [activeTab, setActiveTab] = useState('pos'); 
     const [user, setUser] = useState(null);
-    
-    // --- STATE CHO POS (BÁN HÀNG) ---
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [cart, setCart] = useState([]); 
     const [selectedCategory, setSelectedCategory] = useState("ALL");
     const [searchText, setSearchText] = useState("");
-    const [voucherCode, setVoucherCode] = useState("");
-    const [discount, setDiscount] = useState(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [currentOrderId, setCurrentOrderId] = useState(null);
-    
-    // --- STATE CHO DANH SÁCH ĐƠN HÀNG ---
+    const [printData, setPrintData] = useState({ cart: [], total: 0, orderId: null, date: null });
     const [orderList, setOrderList] = useState([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
 
@@ -72,44 +74,45 @@ const POSPage = () => {
     useEffect(() => {
         fetchData();
         const savedUser = localStorage.getItem("fastfood_user");
-        if (savedUser) setUser(JSON.parse(savedUser));
+        if (savedUser) {
+            try {
+                const u = JSON.parse(savedUser);
+                setUser(u);
+            } catch (e) {}
+        }
         
-        // Load danh sách đơn hàng ban đầu
         fetchOrders();
-        
-        // Tự động refresh đơn hàng mỗi 10 giây để thấy đơn mới từ bếp/khách
-        const interval = setInterval(fetchOrders, 10000);
+        // Tự động làm mới danh sách đơn hàng mỗi 10 giây
+        const interval = setInterval(fetchOrders, 10000); 
         return () => clearInterval(interval);
     }, []);
 
     const fetchData = async () => {
         try {
             const [prodRes, catRes] = await Promise.all([
-                axios.get("http://localhost:8081/api/products"),
-                axios.get("http://localhost:8081/api/categories")
+                axios.get("/api/products"),
+                axios.get("/api/categories")
             ]);
             setProducts(prodRes.data);
             setCategories(catRes.data);
         } catch (error) { console.error("Lỗi tải menu:", error); }
     };
 
-    // --- HÀM TẢI DANH SÁCH ĐƠN HÀNG TỪ SERVER ---
     const fetchOrders = async () => {
         setLoadingOrders(true);
         try {
-            // Đảm bảo Backend đã có API GET /api/orders trả về danh sách
-            const res = await axios.get("http://localhost:8081/api/orders");
+            const res = await axios.get("/api/orders");
+            let data = [];
+            if (Array.isArray(res.data)) data = res.data;
+            else if (res.data && Array.isArray(res.data.content)) data = res.data.content; 
+            
             // Sắp xếp đơn mới nhất lên đầu
-            const sortedOrders = res.data.sort((a, b) => b.id - a.id);
+            const sortedOrders = data.sort((a, b) => b.id - a.id);
             setOrderList(sortedOrders);
-        } catch (error) {
-            console.error("Lỗi tải đơn hàng:", error);
-        } finally {
-            setLoadingOrders(false);
-        }
+        } catch (error) { console.error("Lỗi tải đơn hàng:", error); } 
+        finally { setLoadingOrders(false); }
     };
 
-    // --- LOGIC POS (BÁN HÀNG TẠI QUẦY) ---
     const addToCart = (p) => {
         const exist = cart.find((x) => x.id === p.id);
         if (exist) setCart(cart.map((x) => (x.id === p.id ? { ...exist, qty: exist.qty + 1 } : x)));
@@ -125,41 +128,79 @@ const POSPage = () => {
     };
 
     const removeItem = (id) => setCart(cart.filter((x) => x.id !== id));
-    const subTotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-    const finalTotal = subTotal - (subTotal * discount / 100);
+    const posTotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
 
+    // --- THANH TOÁN TẠI QUẦY ---
     const handleCheckout = async () => {
-        if (cart.length === 0) return message.warning("Trống!");
+        if (cart.length === 0) return message.warning("Giỏ hàng trống!");
+        
         try {
-            const res = await axios.post("http://localhost:8081/api/orders", { items: cart.map((i) => ({ productId: i.id, quantity: i.qty })) });
-            // Sau khi tạo đơn, tự động cập nhật trạng thái là PAID luôn vì bán tại quầy
-            await axios.put(`http://localhost:8081/api/orders/${res.data.id}/status?status=PAID`);
+            // Tạo đơn hàng
+            const res = await axios.post("/api/orders", { 
+                // Nếu là thu ngân tạo đơn, userId có thể để null hoặc ID của thu ngân (tùy logic BE)
+                // Ở đây mình để null để BE hiểu là khách vãng lai, nhưng gắn tên người tạo vào customerName
+                userId: null, 
+                customerName: `Khách tại quầy (TN: ${user?.fullName || 'N/A'})`,
+                items: cart.map((i) => ({ productId: i.id, quantity: i.qty })) 
+            });
+
+            const newOrderId = res.data?.id || res.data?.data?.id;
+
+            if (!newOrderId) {
+                message.error("Lỗi: Server không trả về mã đơn hàng!");
+                return;
+            }
+
+            // Cập nhật trạng thái thành ĐÃ THANH TOÁN (PAID) ngay lập tức
+            await axios.put(`/api/orders/${newOrderId}/status`, { status: 'PAID' });
             
-            setCurrentOrderId(res.data.id);
-            setIsModalOpen(true);
-            message.success("Thành công!");
-            fetchOrders(); // Reload lại danh sách đơn
-        } catch (err) { message.error("Lỗi!"); }
+            // Chuẩn bị dữ liệu in
+            setPrintData({ 
+                cart: cart, 
+                total: posTotal, 
+                orderId: newOrderId, 
+                date: new Date(),
+                cashierName: user?.fullName
+            });
+            
+            setIsModalOpen(true); // Mở popup in bill
+            setCart([]); 
+            message.success("Thanh toán thành công!");
+            fetchOrders(); // Làm mới danh sách
+
+        } catch (err) { 
+            console.error(err);
+            message.error("Lỗi thanh toán! Vui lòng kiểm tra lại server."); 
+        }
     };
     
-    const handleFinishOrder = () => {
-        setCart([]); setIsModalOpen(false); setCurrentOrderId(null);
-    };
-
-    // --- LOGIC XỬ LÝ ĐƠN HÀNG TỪ DANH SÁCH ---
+    // --- XỬ LÝ ĐƠN HÀNG ONLINE ---
     const handleProcessPayment = async (orderId) => {
         try {
-            await axios.put(`http://localhost:8081/api/orders/${orderId}/status?status=PAID`);
-            message.success(`Đã thanh toán đơn #${orderId}`);
+            await axios.put(`/api/orders/${orderId}/status`, { status: 'PAID' });
+            message.success(`Đã thu tiền đơn #${orderId}`);
             fetchOrders();
-        } catch (error) {
-            message.error("Lỗi cập nhật trạng thái!");
-        }
+        } catch (error) { message.error("Lỗi cập nhật trạng thái!"); }
+    };
+
+    const handleReprint = (order) => {
+        // Lấy thông tin để in lại bill cũ
+        const creatorName = order.user ? order.user.fullName : (order.customerName || 'Khách vãng lai');
+        
+        setPrintData({
+            cart: order.items || [], // Backend cần trả về list items trong order
+            total: order.totalPrice || order.totalAmount, 
+            orderId: order.id, 
+            date: order.createdAt || order.orderDate,
+            cashierName: creatorName
+        });
+        setIsModalOpen(true);
     };
 
     const handleLogout = () => {
         localStorage.removeItem("fastfood_user");
-        window.location.reload();
+        localStorage.removeItem("fastfood_token");
+        window.location.href = '/login';
     };
 
     const filteredProducts = products.filter(p => {
@@ -168,20 +209,26 @@ const POSPage = () => {
         return matchCategory && matchSearch;
     });
 
-    // Cột bảng quản lý đơn hàng
+    // --- CẤU HÌNH CỘT BẢNG ĐƠN HÀNG ---
     const orderColumns = [
-        { title: 'ID', dataIndex: 'id', key: 'id', width: 60, render: (text) => <b>#{text}</b> },
+        { 
+            title: 'ID', 
+            dataIndex: 'id', 
+            key: 'id', 
+            width: 80, 
+            render: (text) => <b>#{text}</b> 
+        },
         { 
             title: 'Khách hàng', 
-            dataIndex: 'user', 
-            key: 'user', 
-            render: (u) => u ? <Tag color="blue">{u.fullName}</Tag> : <Tag color="orange">Khách vãng lai</Tag>
+            dataIndex: 'customerName', 
+            key: 'customerName', 
+            render: (text) => <Tag color="blue">{text || 'Khách vãng lai'}</Tag>
         },
         { 
             title: 'Tổng tiền', 
-            dataIndex: 'totalAmount', // <--- ĐÃ SỬA: Khớp với Backend (totalAmount)
-            key: 'totalAmount',
-            render: (price) => <b style={{color: '#cf1322'}}>{price ? price.toLocaleString() : 0} ₫</b>
+            dataIndex: 'totalPrice', // Khớp với BE mới sửa
+            key: 'totalPrice', 
+            render: (price) => <b style={{color: '#cf1322'}}>{Number(price || 0).toLocaleString()} ₫</b> 
         },
         { 
             title: 'Trạng thái', 
@@ -191,26 +238,30 @@ const POSPage = () => {
                 let color = 'default';
                 let text = status;
                 if (status === 'PENDING') { color = 'gold'; text = 'Chờ xác nhận'; }
-                else if (status === 'COOKING') { color = 'blue'; text = 'Đang nấu'; }
-                else if (status === 'COMPLETED') { color = 'green'; text = 'Bếp xong'; } // Bếp đã xong
+                else if (status === 'PROCESSING') { color = 'blue'; text = 'Đang làm'; }
+                else if (status === 'COMPLETED') { color = 'green'; text = 'Xong món'; }
                 else if (status === 'PAID') { color = 'purple'; text = 'Đã thanh toán'; }
                 else if (status === 'CANCELLED') { color = 'red'; text = 'Đã hủy'; }
                 return <Tag color={color}>{text}</Tag>;
             }
         },
-        { title: 'Ngày tạo', dataIndex: 'createdAt', key: 'createdAt', render: (date) => date ? new Date(date).toLocaleString() : '' },
+        { 
+            title: 'Ngày tạo', 
+            dataIndex: 'createdAt', // Khớp với BE mới sửa
+            key: 'createdAt', 
+            render: (date) => date ? new Date(date).toLocaleString('vi-VN') : '' 
+        },
         {
-            title: 'Hành động',
+            title: 'Hành động', 
             key: 'action',
             render: (_, record) => (
                 <Space>
-                    {/* Chỉ hiện nút thanh toán nếu đơn chưa thanh toán */}
+                    {/* Nếu chưa thanh toán thì hiện nút Thu tiền */}
                     {record.status !== 'PAID' && record.status !== 'CANCELLED' && (
-                        <Button type="primary" onClick={() => handleProcessPayment(record.id)}>
-                            Thu tiền
-                        </Button>
+                        <Button type="primary" size="small" onClick={() => handleProcessPayment(record.id)}>Thu tiền</Button>
                     )}
-                    {record.status === 'PAID' && <Button icon={<PrinterOutlined />}>In lại bill</Button>}
+                    {/* Nút in bill luôn hiện để in lại */}
+                    <Button icon={<PrinterOutlined />} size="small" onClick={() => handleReprint(record)}>In Bill</Button>
                 </Space>
             )
         }
@@ -222,10 +273,9 @@ const POSPage = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Title level={4} style={{ margin: 0, color: "#cf1322" }}>🍔 FASTFOOD POS</Title>
-                        <Tag color="blue">Thu ngân</Tag>
+                        {user?.role === 'ADMIN' && <Tag color="red">ADMIN</Tag>}
+                        {user?.role === 'CASHIER' && <Tag color="blue">THU NGÂN</Tag>}
                     </div>
-                    
-                    {/* MENU CHUYỂN ĐỔI TAB */}
                     <Segmented 
                         options={[
                             { label: 'Bán hàng tại quầy', value: 'pos', icon: <ShoppingCartOutlined /> },
@@ -235,22 +285,21 @@ const POSPage = () => {
                         onChange={setActiveTab}
                     />
                 </div>
-                
                 <Space size="large">
                     {activeTab === 'pos' && (
                         <Input placeholder="Tìm món..." prefix={<SearchOutlined />} style={{ width: 300 }} onChange={(e) => setSearchText(e.target.value)} allowClear />
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 15, borderLeft: '1px solid #f0f0f0', paddingLeft: 15 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#87d068' }} />
-                            <Text strong>{user?.fullName || 'Thu ngân'}</Text>
+                            <Avatar icon={<UserOutlined />} style={{ backgroundColor: user ? '#87d068' : '#ccc' }} />
+                            <Text strong>{user ? user.fullName : 'Chưa đăng nhập'}</Text>
                         </div>
                         <Button type="primary" danger icon={<LogoutOutlined />} onClick={handleLogout}>Đăng xuất</Button>
                     </div>
                 </Space>
             </Header>
 
-            {/* --- GIAO DIỆN BÁN HÀNG TẠI QUẦY (POS) --- */}
+            {/* TAB BÁN HÀNG (POS) */}
             {activeTab === 'pos' && (
                 <Layout>
                     <Layout style={{ flex: 1, overflow: 'hidden' }}>
@@ -261,7 +310,7 @@ const POSPage = () => {
                         <Row gutter={[16, 16]}>
                             {filteredProducts.map((p) => (
                             <Col xs={24} sm={12} md={8} lg={6} xl={6} key={p.id}>
-                                <Card hoverable cover={<img alt={p.name} src={p.imageUrl} style={{ height: 150, objectFit: "cover" }} />} onClick={() => addToCart(p)} bodyStyle={{ padding: "12px" }}>
+                                <Card hoverable cover={<img alt={p.name} src={p.imageUrl} style={{ height: 150, objectFit: "cover" }} />} onClick={() => addToCart(p)} styles={{ body: { padding: "12px" } }}>
                                 <Card.Meta title={p.name} description={<Text type="danger" strong>{p.price.toLocaleString()} đ</Text>} />
                                 </Card>
                             </Col>
@@ -269,60 +318,50 @@ const POSPage = () => {
                         </Row>
                         </Content>
                     </Layout>
+                    
+                    {/* Sidebar Giỏ hàng bên phải */}
                     <Sider width={400} theme="light" style={{ borderLeft: "1px solid #f0f0f0", display: "flex", flexDirection: "column", height: '100%' }}>
                         <div style={{ padding: "16px", background: "#fafafa", borderBottom: "1px solid #e8e8e8" }}><Title level={4} style={{ margin: 0 }}><ShoppingCartOutlined /> Giỏ hàng ({cart.length})</Title></div>
+                        
                         <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
-                            <List itemLayout="horizontal" dataSource={cart} renderItem={(item) => (
-                                <List.Item actions={[
-                                    <Button size="small" icon={<MinusOutlined />} onClick={() => updateQty(item.id, -1)} />,
-                                    <Text strong>{item.qty}</Text>,
-                                    <Button size="small" icon={<PlusOutlined />} onClick={() => updateQty(item.id, 1)} />,
-                                    <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeItem(item.id)} />
-                                ]}>
-                                    <List.Item.Meta title={item.name} description={`${item.price.toLocaleString()} đ`} />
-                                    <div style={{ fontWeight: "bold" }}>{(item.price * item.qty).toLocaleString()}</div>
-                                </List.Item>
-                            )} />
+                            {cart.map(item => (
+                                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, paddingBottom: 10, borderBottom: '1px solid #eee' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: 500 }}>{item.name}</div>
+                                        <div style={{ color: '#888', fontSize: 12 }}>{item.price.toLocaleString()} đ</div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Button size="small" icon={<MinusOutlined />} onClick={() => updateQty(item.id, -1)} />
+                                        <Text strong style={{ width: 20, textAlign: 'center' }}>{item.qty}</Text>
+                                        <Button size="small" icon={<PlusOutlined />} onClick={() => updateQty(item.id, 1)} />
+                                        <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeItem(item.id)} />
+                                    </div>
+                                </div>
+                            ))}
+                            {cart.length === 0 && <div style={{ textAlign: 'center', color: '#999', marginTop: 50 }}>Giỏ hàng trống</div>}
                         </div>
+
                         <div style={{ padding: "20px", background: "#fff", borderTop: "2px solid #f0f0f0" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}><Text strong style={{ fontSize: "18px" }}>TỔNG CỘNG:</Text><Text type="danger" strong style={{ fontSize: "24px" }}>{finalTotal.toLocaleString()} đ</Text></div>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}><Text strong style={{ fontSize: "18px" }}>TỔNG CỘNG:</Text><Text type="danger" strong style={{ fontSize: "24px" }}>{posTotal.toLocaleString()} đ</Text></div>
                             <Button type="primary" danger size="large" block onClick={handleCheckout} disabled={cart.length === 0}>THANH TOÁN & IN BILL</Button>
                         </div>
                     </Sider>
                 </Layout>
             )}
 
-            {/* --- GIAO DIỆN QUẢN LÝ ĐƠN HÀNG (DÀNH CHO ĐƠN TỪ KHÁCH/BẾP) --- */}
+            {/* TAB DANH SÁCH ĐƠN HÀNG */}
             {activeTab === 'orders' && (
                 <Content style={{ padding: '24px', background: '#f0f2f5', overflowY: 'auto' }}>
-                    <Card 
-                        title={
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <span>Danh sách đơn hàng chờ xử lý</span>
-                                <Button icon={<SyncOutlined spin={loadingOrders} />} onClick={fetchOrders} size="small">Làm mới</Button>
-                            </div>
-                        } 
-                        bordered={false}
-                    >
-                        <Table 
-                            columns={orderColumns} 
-                            dataSource={orderList} 
-                            rowKey="id" 
-                            loading={loadingOrders}
-                            pagination={{ pageSize: 8 }}
-                        />
+                    <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span>Danh sách đơn hàng</span><Button icon={<SyncOutlined spin={loadingOrders} />} onClick={fetchOrders} size="small">Làm mới</Button></div>} bordered={false}>
+                        <Table columns={orderColumns} dataSource={orderList} rowKey="id" loading={loadingOrders} pagination={{ pageSize: 8 }} />
                     </Card>
                 </Content>
             )}
 
             {/* MODAL IN HÓA ĐƠN */}
-            <Modal title="Thanh toán thành công" open={isModalOpen} onCancel={handleFinishOrder} footer={[<Button key="close" onClick={handleFinishOrder}>Đóng</Button>, <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>In Hóa Đơn</Button>]}>
+            <Modal title="Hóa đơn thanh toán" open={isModalOpen} onCancel={() => setIsModalOpen(false)} footer={[<Button key="close" onClick={() => setIsModalOpen(false)}>Đóng</Button>, <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>In Ngay</Button>]}>
                 <div style={{ border: "1px solid #ddd", padding: "10px", background: "#fff8f8" }}>
-                    <InvoiceToPrint 
-                        ref={componentRef} 
-                        cart={activeTab === 'pos' ? cart : []} // Lưu ý: Nếu in từ Order List thì cần truyền item của order đó vào (Code này đang demo cho POS tab)
-                        subTotal={subTotal} discount={discount} finalTotal={finalTotal} orderId={currentOrderId} cashierName={user?.fullName} 
-                    />
+                    <InvoiceToPrint ref={componentRef} cart={printData.cart} finalTotal={printData.total} orderId={printData.orderId} cashierName={printData.cashierName} orderDate={printData.date} />
                 </div>
             </Modal>
         </Layout>

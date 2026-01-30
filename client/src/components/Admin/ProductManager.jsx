@@ -1,333 +1,279 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Image, Tag, Upload } from 'antd';
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, UploadOutlined, ExperimentOutlined, MinusCircleOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, InputNumber, Select, message, Tag, Space } from 'antd';
+import { 
+    PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, 
+    SaveOutlined, CloseOutlined 
+} from '@ant-design/icons';
 import axios from 'axios';
 
 const ProductManager = () => {
-    // Khởi tạo là mảng rỗng [] để tránh lỗi map lúc đầu
     const [products, setProducts] = useState([]);
-    const [categories, setCategories] = useState([]); 
+    const [categories, setCategories] = useState([]);
+    const [inventory, setInventory] = useState([]); 
     const [loading, setLoading] = useState(false);
     
+    // State Modal Thêm/Sửa Món
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
-    const [form] = Form.useForm();
-    const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
-    const [currentProductForRecipe, setCurrentProductForRecipe] = useState(null);
-    const [allIngredients, setAllIngredients] = useState([]); // List nguyên liệu để chọn
-    const [recipeForm] = Form.useForm();
+    
+    // State Modal Công thức
+    const [recipeModalOpen, setRecipeModalOpen] = useState(false);
+    const [currentProduct, setCurrentProduct] = useState(null);
+    const [recipeList, setRecipeList] = useState([]);
+    
+    // State Sửa Nguyên Liệu trong Công thức
+    const [editingRecipeItem, setEditingRecipeItem] = useState(null);
 
-    // 1. Load dữ liệu (Món ăn + Danh mục)
-    const fetchData = async () => {
+    const [form] = Form.useForm();
+    const [recipeForm] = Form.useForm(); 
+
+    useEffect(() => {
+        fetchProducts();
+        fetchCategories();
+        fetchInventory();
+    }, []);
+
+    const fetchProducts = async () => {
         setLoading(true);
         try {
-            const [prodRes, catRes] = await Promise.all([
-                axios.get('http://localhost:8081/api/products'),
-                axios.get('http://localhost:8081/api/categories')
-            ]);
-            
-            // --- BẢO VỆ: Kiểm tra kỹ dữ liệu trước khi set ---
-            if (Array.isArray(prodRes.data)) {
-                setProducts(prodRes.data);
-            } else {
-                console.warn("API Products trả về lỗi:", prodRes.data);
-                setProducts([]); 
-            }
-
-            if (Array.isArray(catRes.data)) {
-                setCategories(catRes.data);
-            } else {
-                console.warn("API Categories trả về lỗi:", catRes.data);
-                setCategories([]); 
-            }
-            // --------------------------------------------------
-
+            const res = await axios.get('/api/products');
+            setProducts(res.data);
         } catch (error) {
-            console.error("Lỗi gọi API:", error);
-            message.error('Không thể kết nối đến server!');
-            setProducts([]);
-            setCategories([]);
+            message.error("Lỗi tải món ăn!");
         } finally {
             setLoading(false);
         }
     };
 
-    const fetchIngredients = async () => {
-        const res = await axios.get('http://localhost:8081/api/inventory');
-        setAllIngredients(res.data);
+    const fetchCategories = async () => {
+        try { const res = await axios.get('/api/categories'); setCategories(res.data); } catch (e) {}
     };
 
-    // Hàm mở Modal Công thức
-    const openRecipeModal = async (product) => {
-        setCurrentProductForRecipe(product);
-        setIsRecipeModalOpen(true);
-        await fetchIngredients(); // Tải danh sách nguyên liệu mới nhất
-        
-        // Tải công thức hiện tại của món này (nếu có)
-        try {
-            const res = await axios.get(`http://localhost:8081/api/products/${product.id}/ingredients`);
-            // Format lại dữ liệu để đổ vào Form (Ant Design Dynamic Form)
-            const formattedData = res.data.map(item => ({
-                ingredientId: item.ingredient.id,
-                quantity: item.quantityNeeded
-            }));
-            recipeForm.setFieldsValue({ ingredients: formattedData });
-        } catch (e) {
-            recipeForm.resetFields();
-        }
+    const fetchInventory = async () => {
+        try { const res = await axios.get('/api/ingredients'); setInventory(res.data); } catch (e) {}
     };
 
-    // Hàm lưu công thức
-    const handleSaveRecipe = async (values) => {
-        try {
-            await axios.post(`http://localhost:8081/api/products/${currentProductForRecipe.id}/ingredients`, values.ingredients);
-            message.success('Lưu công thức thành công!');
-            setIsRecipeModalOpen(false);
-        } catch (error) {
-            message.error('Lỗi lưu công thức!');
-        }
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    // 2. Xử lý Submit Form
-    const handleFinish = async (values) => {
+    // --- XỬ LÝ MÓN ĂN ---
+    const handleSaveProduct = async (values) => {
         try {
             if (editingProduct) {
-                await axios.put(`http://localhost:8081/api/products/${editingProduct.id}`, values);
-                message.success('Cập nhật thành công!');
+                await axios.put(`/api/products/${editingProduct.id}`, values);
+                message.success("Cập nhật món thành công!");
             } else {
-                await axios.post('http://localhost:8081/api/products', values);
-                message.success('Thêm mới thành công!');
+                await axios.post('/api/products', values);
+                message.success("Thêm món mới thành công!");
             }
-            fetchData();
+            fetchProducts();
             setIsModalOpen(false);
             form.resetFields();
-            setEditingProduct(null);
         } catch (error) {
-            message.error('Có lỗi xảy ra khi lưu!');
+            message.error("Lỗi lưu sản phẩm!");
         }
     };
 
-    const handleDelete = async (id) => {
-        try {
-            await axios.delete(`http://localhost:8081/api/products/${id}`);
-            message.success('Đã xóa!');
-            fetchData();
-        } catch (error) {
-            message.error('Lỗi khi xóa (có thể món đang có trong đơn hàng)!');
-        }
+    const handleDeleteProduct = async (id) => {
+        if(!window.confirm("Xóa món này?")) return;
+        try { await axios.delete(`/api/products/${id}`); fetchProducts(); message.success("Đã xóa!"); } catch (e) { message.error("Lỗi xóa!"); }
     };
 
-    const openEditModal = (record) => {
-        setEditingProduct(record);
-        form.setFieldsValue({
-            ...record,
-            categoryId: record.category ? record.category.id : null
+    // --- 👇 XỬ LÝ CÔNG THỨC (QUAN TRỌNG) 👇 ---
+
+    const openRecipeModal = (product) => {
+        setCurrentProduct(product);
+        // Lấy danh sách từ productIngredients (Backend trả về)
+        setRecipeList(product.productIngredients || []);
+        setRecipeModalOpen(true);
+        handleCancelEdit(); // Reset form sửa
+    };
+
+    const handleEditIngredient = (record) => {
+        setEditingRecipeItem(record); 
+        recipeForm.setFieldsValue({
+            ingredientId: record.ingredient.id,
+            quantity: record.quantityNeeded
         });
-        setIsModalOpen(true);
     };
 
-    // --- BẢO VỆ: Đảm bảo danh sách categories luôn là mảng ---
-    const safeCategories = Array.isArray(categories) ? categories : [];
+    const handleCancelEdit = () => {
+        setEditingRecipeItem(null);
+        recipeForm.resetFields();
+    };
 
+    const handleAddOrUpdateIngredient = async (values) => {
+        try {
+            await axios.post(`/api/products/${currentProduct.id}/ingredients`, {
+                ingredientId: values.ingredientId,
+                quantity: values.quantity
+            });
+            
+            message.success(editingRecipeItem ? "Đã cập nhật định lượng!" : "Đã thêm nguyên liệu!");
+            handleCancelEdit();
+            
+            // Reload lại dữ liệu để cập nhật danh sách ngay lập tức
+            const res = await axios.get('/api/products');
+            setProducts(res.data);
+            
+            // Cập nhật lại list công thức đang hiển thị
+            const updatedProduct = res.data.find(p => p.id === currentProduct.id);
+            setRecipeList(updatedProduct.productIngredients || []); 
+
+        } catch (error) {
+            console.error(error);
+            message.error("Lỗi lưu nguyên liệu!");
+        }
+    };
+
+    const handleRemoveIngredient = async (ingredientId) => {
+        try {
+            await axios.delete(`/api/products/${currentProduct.id}/ingredients/${ingredientId}`);
+            message.success("Đã xóa nguyên liệu!");
+            
+            if (editingRecipeItem?.ingredient?.id === ingredientId) {
+                handleCancelEdit();
+            }
+
+            // Reload lại dữ liệu
+            const res = await axios.get('/api/products');
+            setProducts(res.data);
+            
+            // Cập nhật lại list công thức đang hiển thị
+            const updatedProduct = res.data.find(p => p.id === currentProduct.id);
+            setRecipeList(updatedProduct.productIngredients || []);
+
+        } catch (error) {
+            message.error("Lỗi xóa nguyên liệu!");
+        }
+    };
+
+    // --- CỘT BẢNG MÓN ĂN ---
     const columns = [
-        { title: 'ID', dataIndex: 'id', width: 60, align: 'center' },
+        { title: 'Hình ảnh', dataIndex: 'imageUrl', align: 'center', render: url => <img src={url} alt="img" style={{width: 50, height: 50, objectFit: 'cover', borderRadius: 4}} /> },
+        { title: 'Tên món', dataIndex: 'name', render: text => <b>{text}</b> },
+        { title: 'Giá', dataIndex: 'price', render: val => val?.toLocaleString() + ' đ' },
         { 
-            title: 'Hình ảnh', 
-            dataIndex: 'imageUrl', 
-            width: 100,
-            render: (url) => <Image src={url || "error"} fallback="https://placehold.co/100?text=No+Img" width={60} height={60} className="object-cover rounded border"/> 
-        },
-        { 
-            title: 'Tên món', 
-            dataIndex: 'name', 
-            className: 'font-semibold',
-            render: (text, record) => (
-                <div>
-                    <div className="text-base">{text}</div>
-                    <div className="text-gray-400 text-xs truncate w-40">{record.description}</div>
-                </div>
+            title: 'Công thức', 
+            align: 'center',
+            render: (_, record) => (
+                <Button 
+                    // Kiểm tra độ dài productIngredients để đổi kiểu nút
+                    type={record.productIngredients && record.productIngredients.length > 0 ? "default" : "dashed"}
+                    icon={<EyeOutlined />} 
+                    onClick={() => openRecipeModal(record)}
+                >
+                    Công thức ({record.productIngredients?.length || 0})
+                </Button>
             )
-        },
-        { 
-            title: 'Giá bán', 
-            dataIndex: 'price', 
-            width: 120,
-            render: (price) => <span className="text-green-600 font-bold">{price?.toLocaleString()} đ</span>,
-            sorter: (a, b) => a.price - b.price 
-        },
-        { 
-            title: 'Danh mục', 
-            dataIndex: 'category',
-            width: 150,
-            render: (cat) => cat ? <Tag color="blue">{cat.name}</Tag> : <Tag color="red">Chưa phân loại</Tag>,
-            filters: safeCategories.map(c => ({ text: c.name, value: c.id })),
-            onFilter: (value, record) => record.category?.id === value,
         },
         {
             title: 'Hành động',
-            width: 150,
+            align: 'center',
             render: (_, record) => (
-                <div className="flex gap-2">
-                    {/* NÚT CÔNG THỨC MỚI */}
-                    <Button 
-                        icon={<ExperimentOutlined />} 
-                        className="text-purple-600 border-purple-600"
-                        title="Thiết lập công thức"
-                        onClick={() => openRecipeModal(record)} 
-                    />
-                    
-                    <Button icon={<EditOutlined />} onClick={() => openEditModal(record)} />
-                    <Popconfirm title="Xóa món này?" onConfirm={() => handleDelete(record.id)} okButtonProps={{ danger: true }}>
-                        <Button danger icon={<DeleteOutlined />} />
-                    </Popconfirm>
-                </div>
-            ),
-        },
+                <>
+                    <Button icon={<EditOutlined />} onClick={() => { setEditingProduct(record); form.setFieldsValue(record); setIsModalOpen(true); }} style={{marginRight: 8}} />
+                    <Button danger icon={<DeleteOutlined />} onClick={() => handleDeleteProduct(record.id)} />
+                </>
+            )
+        }
+    ];
+
+    // --- CỘT BẢNG CÔNG THỨC ---
+    const recipeColumns = [
+        { title: 'Nguyên liệu', render: r => <b>{r.ingredient?.name}</b> },
+        { title: 'Định lượng cần', render: r => <Tag color="blue">{r.quantityNeeded} {r.ingredient?.unit}</Tag> },
+        { 
+            title: 'Hành động', 
+            align: 'center',
+            width: 120,
+            render: (r) => (
+                <Space>
+                    <Button size="small" icon={<EditOutlined />} type="primary" ghost onClick={() => handleEditIngredient(r)} />
+                    <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleRemoveIngredient(r.ingredient.id)} />
+                </Space>
+            ) 
+        }
     ];
 
     return (
-        <div className="p-4 bg-white rounded shadow-sm h-full">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold m-0">Quản lý Thực đơn</h3>
-                <div className="flex gap-2">
-                    <Button icon={<ReloadOutlined />} onClick={fetchData}>Làm mới</Button>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingProduct(null); form.resetFields(); setIsModalOpen(true); }}>
-                        Thêm Món Mới
-                    </Button>
-                </div>
+        <div>
+            <div style={{marginBottom: 16, display: 'flex', justifyContent: 'space-between'}}>
+                <h2>Quản lý Món ăn</h2>
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingProduct(null); form.resetFields(); setIsModalOpen(true); }}>
+                    Thêm món mới
+                </Button>
             </div>
 
-            <Table 
-                dataSource={Array.isArray(products) ? products : []} 
-                columns={columns} 
-                rowKey="id" 
-                loading={loading}
-                bordered 
-                pagination={{ pageSize: 6 }} 
-            />
+            <Table dataSource={products} columns={columns} rowKey="id" loading={loading} bordered />
 
-            <Modal
-                title={editingProduct ? "Cập nhật món ăn" : "Thêm món ăn mới"}
-                open={isModalOpen}
-                onCancel={() => setIsModalOpen(false)}
-                onOk={() => form.submit()}
-                maskClosable={false}
-            >
-                <Form form={form} layout="vertical" onFinish={handleFinish}>
-                    <Form.Item name="name" label="Tên món ăn" rules={[{ required: true, message: 'Vui lòng nhập tên!' }]}>
-                        <Input />
+            {/* Modal Thêm/Sửa Món ăn */}
+            <Modal title={editingProduct ? "Sửa món" : "Thêm món"} open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={form.submit}>
+                <Form form={form} layout="vertical" onFinish={handleSaveProduct}>
+                    <Form.Item name="name" label="Tên món" rules={[{ required: true }]}><Input /></Form.Item>
+                    <Form.Item name="price" label="Giá bán" rules={[{ required: true }]}><InputNumber style={{width: '100%'}} /></Form.Item>
+                    <Form.Item name="categoryId" label="Danh mục" rules={[{ required: true }]}>
+                        <Select options={categories.map(c => ({ label: c.name, value: c.id }))} />
                     </Form.Item>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <Form.Item name="price" label="Giá bán (VNĐ)" rules={[{ required: true, message: 'Vui lòng nhập giá!' }]}>
-                            <InputNumber 
-                                style={{ width: '100%' }} 
-                                formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} 
-                                parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                                min={0}
-                            />
-                        </Form.Item>
-                        
-                        <Form.Item name="categoryId" label="Danh mục" rules={[{ required: true, message: 'Vui lòng chọn danh mục!' }]}>
-                            <Select placeholder="-- Chọn danh mục --">
-                                {safeCategories.map(cat => (
-                                    <Select.Option key={cat.id} value={cat.id}>{cat.name}</Select.Option>
-                                ))}
-                            </Select>
-                        </Form.Item>
-                    </div>
-
-                    {/* --- PHẦN UPLOAD ẢNH --- */}
-                    <Form.Item label="Hình ảnh món ăn">
-                        {/* Input ẩn để giữ giá trị URL gửi đi khi submit */}
-                        <Form.Item name="imageUrl" noStyle>
-                            <Input hidden />
-                        </Form.Item>
-
-                        <Upload
-                            name="file"
-                            action="http://localhost:8081/api/upload" // API upload của Backend
-                            listType="picture"
-                            maxCount={1}
-                            onChange={(info) => {
-                                if (info.file.status === 'done') {
-                                    // Lấy đường dẫn ảnh từ server trả về gán vào Form
-                                    const url = info.file.response.url;
-                                    form.setFieldsValue({ imageUrl: url });
-                                    message.success('Upload ảnh thành công!');
-                                } else if (info.file.status === 'error') {
-                                    message.error('Upload thất bại.');
-                                }
-                            }}
-                        >
-                            <Button icon={<UploadOutlined />}>Tải ảnh lên (Click)</Button>
-                        </Upload>
-                    </Form.Item>
-
-                    <Form.Item name="imageUrl" label="Hoặc nhập link ảnh (nếu không upload)">
-                        <Input placeholder="http://..." />
-                    </Form.Item>
-
-                    <Form.Item name="description" label="Mô tả">
-                        <Input.TextArea rows={3} placeholder="Thành phần, ghi chú..." />
-                    </Form.Item>
+                    <Form.Item name="imageUrl" label="Link ảnh"><Input /></Form.Item>
+                    <Form.Item name="description" label="Mô tả"><Input.TextArea /></Form.Item>
+                    <Form.Item name="isAvailable" label="Trạng thái"><Select options={[{label: 'Đang bán', value: true}, {label: 'Ngừng bán', value: false}]} /></Form.Item>
                 </Form>
             </Modal>
 
-            {/* --- MODAL CÔNG THỨC (MỚI) --- */}
+            {/* MODAL QUẢN LÝ CÔNG THỨC */}
             <Modal
-                title={`Công thức: ${currentProductForRecipe?.name}`}
-                open={isRecipeModalOpen}
-                onCancel={() => setIsRecipeModalOpen(false)}
-                onOk={() => recipeForm.submit()}
-                width={600}
+                title={`Công thức: ${currentProduct?.name || ''}`}
+                open={recipeModalOpen}
+                onCancel={() => setRecipeModalOpen(false)}
+                footer={null}
+                width={700}
             >
-                <div className="mb-4 text-gray-500 italic">
-                    Định lượng nguyên liệu sẽ bị trừ kho khi bán 1 đơn vị món này.
-                </div>
-                <Form form={recipeForm} onFinish={handleSaveRecipe} layout="vertical">
-                    <Form.List name="ingredients">
-                        {(fields, { add, remove }) => (
-                            <>
-                                {fields.map(({ key, name, ...restField }) => (
-                                    <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
-                                        <Form.Item
-                                            {...restField}
-                                            name={[name, 'ingredientId']}
-                                            rules={[{ required: true, message: 'Chọn nguyên liệu' }]}
-                                            style={{ width: 250 }}
-                                        >
-                                            <Select placeholder="Chọn nguyên liệu">
-                                                {allIngredients.map(ing => (
-                                                    <Select.Option key={ing.id} value={ing.id}>
-                                                        {ing.name} (Tồn: {ing.quantity} {ing.unit})
-                                                    </Select.Option>
-                                                ))}
-                                            </Select>
-                                        </Form.Item>
-                                        <Form.Item
-                                            {...restField}
-                                            name={[name, 'quantity']}
-                                            rules={[{ required: true, message: 'Nhập số lượng' }]}
-                                        >
-                                            <InputNumber placeholder="Số lượng" min={0} step={0.01} style={{ width: 120 }} />
-                                        </Form.Item>
-                                        <MinusCircleOutlined onClick={() => remove(name)} />
-                                    </Space>
-                                ))}
-                                <Form.Item>
-                                    <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                                        Thêm nguyên liệu
+                <div style={{ marginBottom: 20, background: '#f5f5f5', padding: 15, borderRadius: 8, border: '1px solid #e0e0e0' }}>
+                    <div style={{ marginBottom: 10, fontWeight: 'bold', color: editingRecipeItem ? '#1677ff' : '#333' }}>
+                        {editingRecipeItem ? `✏️ Đang sửa: ${editingRecipeItem.ingredient?.name}` : '➕ Thêm nguyên liệu vào món:'}
+                    </div>
+                    
+                    <Form form={recipeForm} layout="inline" onFinish={handleAddOrUpdateIngredient}>
+                        <Form.Item name="ingredientId" rules={[{ required: true, message: 'Chọn NL' }]} style={{width: 220}}>
+                            <Select 
+                                placeholder="Chọn nguyên liệu" 
+                                showSearch
+                                optionFilterProp="label"
+                                disabled={!!editingRecipeItem} 
+                                options={inventory.map(ing => ({ label: `${ing.name} (${ing.unit})`, value: ing.id }))} 
+                            />
+                        </Form.Item>
+                        <Form.Item name="quantity" rules={[{ required: true, message: 'Nhập số' }]}>
+                            <InputNumber placeholder="Số lượng" min={0} step={0.01} style={{width: 120}} />
+                        </Form.Item>
+                        <Form.Item>
+                            <Space>
+                                <Button 
+                                    type="primary" 
+                                    htmlType="submit" 
+                                    icon={editingRecipeItem ? <SaveOutlined /> : <PlusOutlined />}
+                                    style={{ background: editingRecipeItem ? '#faad14' : '#1677ff' }}
+                                >
+                                    {editingRecipeItem ? "Cập nhật" : "Thêm"}
+                                </Button>
+                                
+                                {editingRecipeItem && (
+                                    <Button onClick={handleCancelEdit} icon={<CloseOutlined />}>
+                                        Hủy
                                     </Button>
-                                </Form.Item>
-                            </>
-                        )}
-                    </Form.List>
-                </Form>
+                                )}
+                            </Space>
+                        </Form.Item>
+                    </Form>
+                </div>
+
+                <Table 
+                    dataSource={recipeList}
+                    // Key kết hợp id để tránh trùng lặp
+                    rowKey={record => record.id || record.ingredient.id}
+                    pagination={false}
+                    size="small"
+                    bordered
+                    columns={recipeColumns}
+                />
             </Modal>
         </div>
     );

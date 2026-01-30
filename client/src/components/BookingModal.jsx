@@ -32,7 +32,7 @@ const BookingModal = ({ open, onCancel, user }) => {
 
     const fetchTables = async () => {
         try {
-            const res = await axios.get('http://localhost:8081/api/tables');
+            const res = await axios.get('/api/tables');
             setTables(res.data);
         } catch (error) {
             console.error("Lỗi tải danh sách bàn");
@@ -62,7 +62,7 @@ const BookingModal = ({ open, onCancel, user }) => {
                 bookingTime: bookingTime
             };
 
-            const url = user ? `http://localhost:8081/api/reservations?userId=${user.id}` : 'http://localhost:8081/api/reservations';
+            const url = user ? `/api/reservations?userId=${user.id}` : '/api/reservations';
             await axios.post(url, payload);
 
             message.success('Gửi yêu cầu thành công! Chúng tôi sẽ gọi xác nhận.');

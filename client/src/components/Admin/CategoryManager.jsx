@@ -16,7 +16,7 @@ const CategoryManager = () => {
     const fetchCategories = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:8081/api/categories');
+            const res = await axios.get('/api/categories');
             
             // --- BẢO VỆ: Kiểm tra xem có phải mảng không ---
             if (Array.isArray(res.data)) {
@@ -44,10 +44,10 @@ const CategoryManager = () => {
     const handleFinish = async (values) => {
         try {
             if (editingCategory) {
-                await axios.put(`http://localhost:8081/api/categories/${editingCategory.id}`, values);
+                await axios.put(`/api/categories/${editingCategory.id}`, values);
                 message.success('Cập nhật thành công!');
             } else {
-                await axios.post('http://localhost:8081/api/categories', values);
+                await axios.post('/api/categories', values);
                 message.success('Thêm mới thành công!');
             }
             fetchCategories();
@@ -62,7 +62,7 @@ const CategoryManager = () => {
     // 4. Xử lý Xóa
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:8081/api/categories/${id}`);
+            await axios.delete(`/api/categories/${id}`);
             message.success('Đã xóa danh mục!');
             fetchCategories();
         } catch (error) {

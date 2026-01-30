@@ -8,7 +8,7 @@ const { Title, Text } = Typography;
 const RegisterPage = ({ onSwitchToLogin }) => {
     const onFinish = async (values) => {
         try {
-            await axios.post('http://localhost:8081/api/auth/register', values);
+            await axios.post('/api/auth/register', values);
             message.success("Đăng ký thành công! Hãy đăng nhập.");
             onSwitchToLogin(); // Chuyển về trang login
         } catch (error) {

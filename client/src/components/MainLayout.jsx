@@ -1,6 +1,7 @@
-import React from 'react';
-import { Layout, FloatButton, Badge } from 'antd'; // <-- 1. Import thêm FloatButton, Badge
+import React, { useRef } from 'react';
+import { Layout, Button, Badge } from 'antd';
 import { ShoppingCartOutlined } from '@ant-design/icons';
+import Draggable from 'react-draggable';
 import CustomerHeader from './CustomerHeader';
 import CustomerFooter from './CustomerFooter';
 
@@ -19,13 +20,28 @@ const MainLayout = ({
     onGoToAbout, 
     onGoToContact,
     
-    // NHẬN THÊM PROPS:
-    onOpenCart,  // Hàm mở giỏ hàng
-    cartCount = 0, // Số lượng món trong giỏ (để hiển thị số đỏ đỏ)
-
-    searchText,  
+    onOpenCart,   
+    cartCount = 0, 
+    searchText,   
     onSearch     
 }) => {
+    // 1. Ref cho Draggable (để tránh lỗi findDOMNode)
+    const nodeRef = useRef(null);
+    
+    // 2. Ref để kiểm tra xem có đang kéo hay không
+    const isDraggingRef = useRef(false);
+
+    const handleOpenCart = (e) => {
+        // 3. Logic chặn click khi đang kéo
+        // Nếu cờ hiệu đang là TRUE (đang kéo) thì dừng lại, không mở giỏ
+        if (isDraggingRef.current) {
+            e.preventDefault();
+            return;
+        }
+        // Nếu không kéo thì mở bình thường
+        onOpenCart();
+    };
+
     return (
         <Layout style={{ minHeight: '100vh', position: 'relative' }}>
             <CustomerHeader 
@@ -49,18 +65,46 @@ const MainLayout = ({
 
             <CustomerFooter />
 
-            {/* --- 2. THÊM NÚT GIỎ HÀNG NỔI TẠI ĐÂY --- */}
-            <FloatButton.Group shape="circle" style={{ right: 24, bottom: 80 }}>
-                <Badge count={cartCount} showZero={false} offset={[-5, 5]}>
-                    <FloatButton 
-                        icon={<ShoppingCartOutlined />} 
-                        type="primary" 
-                        style={{ width: 60, height: 60 }}
-                        onClick={onOpenCart} // Bấm vào sẽ gọi hàm mở giỏ hàng
-                        tooltip={<div>Xem giỏ hàng & Thanh toán</div>}
-                    />
-                </Badge>
-            </FloatButton.Group>
+            {/* --- GIỎ HÀNG KÉO THẢ ĐƯỢC (ĐÃ FIX LỖI CLICK) --- */}
+            <div style={{ position: 'fixed', bottom: '100px', right: '50px', zIndex: 9999 }}>
+                
+                <Draggable 
+                    nodeRef={nodeRef}
+                    // 4. Khi bắt đầu kéo -> Ghi nhận "Đang chuyển động"
+                    onDrag={() => { isDraggingRef.current = true; }}
+                    
+                    // 5. Khi thả chuột ra -> Đợi 1 chút rồi mới tắt cờ hiệu
+                    // (Mục đích: Để sự kiện onClick bên dưới kịp nhận ra là vừa mới kéo xong)
+                    onStop={() => {
+                        setTimeout(() => {
+                            isDraggingRef.current = false;
+                        }, 100); 
+                    }}
+                >
+                    <div ref={nodeRef} style={{ cursor: 'move', display: 'inline-block' }}>
+                        <Badge count={cartCount} showZero={false} offset={[-5, 5]}>
+                            <Button 
+                                id="floating-cart-icon"
+                                type="primary" 
+                                shape="circle" 
+                                icon={<ShoppingCartOutlined style={{ fontSize: '24px' }} />} 
+                                size="large"
+                                style={{ 
+                                    width: '60px', 
+                                    height: '60px', 
+                                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    border: '2px solid white'
+                                }}
+                                // 6. Thay hàm onOpenCart trực tiếp bằng hàm handleOpenCart đã bọc logic kiểm tra
+                                onClick={handleOpenCart} 
+                            />
+                        </Badge>
+                    </div>
+                </Draggable>
+            </div>
 
         </Layout>
     );

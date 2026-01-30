@@ -15,7 +15,7 @@ const BranchManagement = () => {
 
     const fetchBranches = async () => {
         try {
-            const res = await axios.get('http://localhost:8081/api/branches');
+            const res = await axios.get('/api/branches');
             setBranches(res.data);
         } catch (error) {
             message.error("Lỗi tải danh sách chi nhánh!");
@@ -36,7 +36,7 @@ const BranchManagement = () => {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:8081/api/branches/${id}`);
+            await axios.delete(`/api/branches/${id}`);
             message.success("Đã xóa chi nhánh!");
             fetchBranches();
         } catch (error) {
@@ -47,10 +47,10 @@ const BranchManagement = () => {
     const onFinish = async (values) => {
         try {
             if (editingBranch) {
-                await axios.put(`http://localhost:8081/api/branches/${editingBranch.id}`, values);
+                await axios.put(`/api/branches/${editingBranch.id}`, values);
                 message.success("Cập nhật thành công!");
             } else {
-                await axios.post('http://localhost:8081/api/branches', values);
+                await axios.post('/api/branches', values);
                 message.success("Thêm mới thành công!");
             }
             setIsModalOpen(false);

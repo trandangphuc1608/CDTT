@@ -11,7 +11,7 @@ const UserManager = () => {
 
     const fetchUsers = async () => {
         try {
-            const res = await axios.get('http://localhost:8081/api/users');
+            const res = await axios.get('/api/users');
             setUsers(res.data);
         } catch (error) {
             message.error('Lỗi tải danh sách người dùng!');
@@ -25,10 +25,10 @@ const UserManager = () => {
     const handleFinish = async (values) => {
         try {
             if (editingUser) {
-                await axios.put(`http://localhost:8081/api/users/${editingUser.id}`, values);
+                await axios.put(`/api/users/${editingUser.id}`, values);
                 message.success('Cập nhật thành công!');
             } else {
-                await axios.post('http://localhost:8081/api/users', values);
+                await axios.post('/api/users', values);
                 message.success('Thêm người dùng thành công!');
             }
             fetchUsers();
@@ -42,7 +42,7 @@ const UserManager = () => {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:8081/api/users/${id}`);
+            await axios.delete(`/api/users/${id}`);
             message.success('Đã xóa người dùng!');
             fetchUsers();
         } catch (error) {

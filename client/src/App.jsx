@@ -1,51 +1,50 @@
 import React, { useState, useEffect } from "react";
+import { Routes, Route, useNavigate, Navigate, useLocation } from "react-router-dom";
+
+// Import các components
 import POSPage from "./components/POSPage";
 import CartPage from "./components/CartPage";
-import KitchenView from "./components/KitchenView";
+import KitchenView from "./components/KitchenPage";
 import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 import AdminDashboard from "./components/AdminDashboard";
+import OrderHistoryPage from "./components/Admin/OrderHistoryPage";
 import HomePage from "./components/HomePage";
 import MenuPage from "./components/MenuPage";
 import ProfilePage from "./components/ProfilePage";
 import MainLayout from "./components/MainLayout";
 import CustomerOrderHistory from './components/CustomerOrderHistory';
-import BookingModal from './components/BookingModal'; // You might want to remove this if fully replacing with TableManagementPage
-import TableManagementPage from "./components/TableManagementPage"; // <--- New Import
+import TableManagementPage from "./components/TableManagementPage";
 import AboutPage from "./components/AboutPage";
 import ContactPage from "./components/ContactPage";
+import ProductDetailPage from "./components/ProductDetailPage";
+import FavoriteProducts from "./components/FavoriteProducts";
+import PaymentReturn from './components/PaymentReturn';
+import PrivacyPolicy from "./components/PrivacyPolicy";
+import TermsOfUse from "./components/TermsOfUse";
+import ChatBot from "./components/ChatBot";
+
+import './axiosConfig';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [showLogin, setShowLogin] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
-
-  // Navigation State
-  const [isOrdering, setIsOrdering] = useState(false);
-  const [showMenuPage, setShowMenuPage] = useState(false);
-  const [showProfilePage, setShowProfilePage] = useState(false);
-  const [showAboutPage, setShowAboutPage] = useState(false);
-  const [showContactPage, setShowContactPage] = useState(false);
-  const [showTablePage, setShowTablePage] = useState(false); // <--- New State for Table Page
-
-  // --- IMPORTANT STATE: STORE TARGET CATEGORY ID ---
-  const [targetCategoryId, setTargetCategoryId] = useState(null);
-
   const [searchText, setSearchText] = useState('');
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  // const [showBookingModal, setShowBookingModal] = useState(false); // Can be deprecated if using TableManagementPage
-
-  // Cart Count State
   const [cartCount, setCartCount] = useState(0);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const savedUser = localStorage.getItem("fastfood_user");
-    if (savedUser) setUser(JSON.parse(savedUser));
-
-    // Initial cart count check
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      if (location.pathname === '/' && parsedUser.role === 'ADMIN') navigate('/admin');
+      if (location.pathname === '/' && parsedUser.role === 'CASHIER') navigate('/pos');
+      if (location.pathname === '/' && parsedUser.role === 'KITCHEN') navigate('/kitchen');
+    }
     updateCartCount();
-
-    // Listen for storage events to update cart count
     window.addEventListener('storage', updateCartCount);
     return () => window.removeEventListener('storage', updateCartCount);
   }, []);
@@ -59,136 +58,128 @@ function App() {
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     localStorage.setItem("fastfood_user", JSON.stringify(userData));
-    setShowLogin(false);
-  };
-
-  const resetNavigation = () => {
-    setIsOrdering(false);
-    setShowMenuPage(false);
-    setShowProfilePage(false);
-    setShowAboutPage(false);
-    setShowContactPage(false);
-    setShowTablePage(false); // <--- Reset Table Page
+    
+    switch (userData.role) {
+      case "ADMIN": navigate("/admin"); break;
+      case "CASHIER": navigate("/pos"); break;
+      case "KITCHEN": navigate("/kitchen"); break;
+      default: navigate("/"); 
+    }
   };
 
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("fastfood_user");
-    setShowLogin(false);
-    resetNavigation();
     setSearchText('');
-  };
-
-  // --- NAVIGATION FUNCTIONS ---
-  const handleGoToMenu = (categoryId = null) => {
-    resetNavigation();
-    setTargetCategoryId(categoryId);
-    setShowMenuPage(true);
+    navigate("/login");
   };
 
   const handleSearch = (value) => {
     setSearchText(value);
-    if (value && !showMenuPage) {
-      handleGoToMenu(null);
+    if (value && location.pathname !== '/menu') {
+      navigate('/menu');
     }
   };
 
-  const renderView = () => {
-    // Layout content for customers
-    const CustomerLayoutContent = (
+  const CustomerLayoutWrapper = ({ children }) => {
+    return (
       <MainLayout
         user={user}
-        onLogin={() => user ? {} : setShowLogin(true)}
+        onLogin={() => navigate("/login")}
         onLogout={handleLogout}
-
-        onGoHome={() => { resetNavigation(); setSearchText(''); }}
-        onGoToMenu={() => handleGoToMenu(null)}
-        onGoToProfile={() => {
-          if (!user) setShowLogin(true);
-          else { resetNavigation(); setShowProfilePage(true); }
-        }}
-        onGoToAbout={() => { resetNavigation(); setShowAboutPage(true); }}
-        onGoToContact={() => { resetNavigation(); setShowContactPage(true); }}
-
-        // --- NEW: Go to Table Booking ---
-        onShowBooking={() => { // Using onShowBooking prop to trigger Table Page instead of Modal
-             resetNavigation();
-             setShowTablePage(true);
-        }}
+        onGoHome={() => navigate("/")}
+        onGoToMenu={() => navigate("/menu")}
+        onGoToProfile={() => user ? navigate("/profile") : navigate("/login")}
+        onGoToAbout={() => navigate("/about")}
+        onGoToContact={() => navigate("/contact")}
+        onShowBooking={() => navigate("/table-booking")}
         
-        // --- CART LOGIC ---
-        onOpenCart={() => {
-          setIsOrdering(true);
-        }}
+        onOpenCart={() => navigate("/cart")}
         cartCount={cartCount}
-        
-        onShowHistory={() => user ? setShowHistoryModal(true) : setShowLogin(true)}
+        onShowHistory={() => user ? setShowHistoryModal(true) : navigate("/login")}
         
         searchText={searchText}
         onSearch={handleSearch}
       >
-        {showTablePage ? (
-            <TableManagementPage 
-                user={user} 
-                onGoHome={() => { resetNavigation(); }} 
-                onLogout={handleLogout} 
-            />
-        ) : showProfilePage ? (
-          <ProfilePage user={user} onUserUpdated={(u) => { setUser(u); localStorage.setItem("fastfood_user", JSON.stringify(u)); }} />
-        ) : showAboutPage ? (
-          <AboutPage onGoToMenu={() => handleGoToMenu(null)} />
-        ) : showContactPage ? (
-          <ContactPage />
-        ) : showMenuPage ? (
-          <MenuPage
-            user={user}
-            onLogin={() => setShowLogin(true)}
-            onOrder={() => setIsOrdering(true)}
-            searchText={searchText}
-            initialCategoryId={targetCategoryId}
-          />
-        ) : (
-          <HomePage
-            onGoToMenu={handleGoToMenu}
-            onOrder={() => user ? setIsOrdering(true) : setShowLogin(true)}
-            user={user}
-          />
-        )}
+        {children}
       </MainLayout>
     );
+  };
 
-    if (user) {
-      switch (user.role) {
-        case "ADMIN": return <AdminDashboard onLogout={handleLogout} />;
-        case "KITCHEN": return <KitchenView onLogout={handleLogout} />;
-
-        // --- CASHIER CASE ---
-        case "CASHIER": return <POSPage />;
-
-        // --- CUSTOMER CASE ---
-        case "CUSTOMER":
-        case "GUEST":
-          if (isOrdering) {
-            return <CartPage onGoHome={() => setIsOrdering(false)} />;
-          }
-          return CustomerLayoutContent;
-
-        default: return <div className="text-center mt-5">Vai trò không hợp lệ!</div>;
-      }
+  const ProtectedRoute = ({ children, allowedRoles }) => {
+    if (!user) return <Navigate to="/login" />;
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      return <div className="text-center mt-5">Bạn không có quyền truy cập trang này!</div>;
     }
-
-    if (showRegister) return <RegisterPage onSwitchToLogin={() => { setShowRegister(false); setShowLogin(true); }} />;
-    if (showLogin) return <LoginPage onLogin={handleLoginSuccess} onGuest={() => { setUser({ role: "GUEST", fullName: "Khách" }); setShowLogin(false); }} onSwitchToRegister={() => { setShowLogin(false); setShowRegister(true); }} />;
-
-    return CustomerLayoutContent;
+    return children;
   };
 
   return (
     <div className="container-fluid p-0 bg-light min-vh-100">
-      {renderView()}
+      <Routes>
+        <Route path="/login" element={<LoginPage onLogin={handleLoginSuccess} onGuest={() => { setUser({ role: "GUEST", fullName: "Khách" }); navigate("/"); }} onSwitchToRegister={() => navigate("/register")} />} />
+        <Route path="/register" element={<RegisterPage onSwitchToLogin={() => navigate("/login")} />} />
+
+        {/* CUSTOMER ROUTES */}
+        <Route path="/" element={<CustomerLayoutWrapper><HomePage onGoToMenu={() => navigate("/menu")} onOrder={() => navigate("/menu")} user={user} /></CustomerLayoutWrapper>} />
+        <Route path="/menu" element={<CustomerLayoutWrapper><MenuPage user={user} onLogin={() => navigate("/login")} searchText={searchText} /></CustomerLayoutWrapper>} />
+        <Route path="/about" element={<CustomerLayoutWrapper><AboutPage onGoToMenu={() => navigate("/menu")} /></CustomerLayoutWrapper>} />
+        <Route path="/contact" element={<CustomerLayoutWrapper><ContactPage /></CustomerLayoutWrapper>} />
+        
+        <Route path="/profile" element={<ProtectedRoute allowedRoles={['CUSTOMER', 'GUEST', 'ADMIN', 'CASHIER', 'KITCHEN']}><CustomerLayoutWrapper><ProfilePage user={user} onUserUpdated={(u) => { setUser(u); localStorage.setItem("fastfood_user", JSON.stringify(u)); }} /></CustomerLayoutWrapper></ProtectedRoute>} />
+        <Route path="/table-booking" element={<CustomerLayoutWrapper><TableManagementPage user={user} onGoHome={() => navigate("/")} onLogout={handleLogout} /></CustomerLayoutWrapper>} />
+        <Route path="/cart" element={<CartPage onGoHome={() => navigate("/menu")} />} />
+        <Route path="/payment_return" element={<PaymentReturn />} />
+
+        {/* STAFF ROUTES */}
+        <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboard onLogout={handleLogout} /></ProtectedRoute>} />
+        <Route path="/admin/orders" element={<ProtectedRoute allowedRoles={['ADMIN']}><OrderHistoryPage /></ProtectedRoute>} />
+        <Route path="/pos" element={<ProtectedRoute allowedRoles={['CASHIER', 'ADMIN']}><POSPage /></ProtectedRoute>} />
+        <Route path="/kitchen" element={<ProtectedRoute allowedRoles={['KITCHEN', 'ADMIN']}><KitchenView onLogout={handleLogout} /></ProtectedRoute>} />
+
+        {/* ROUTE CHI TIẾT SẢN PHẨM */}
+        <Route 
+          path="/product/:id" 
+          element={
+             <CustomerLayoutWrapper>
+                <ProductDetailPage onOrder={() => navigate("/cart")} />
+             </CustomerLayoutWrapper>
+          } 
+        />
+
+        {/* ROUTE YÊU THÍCH (ĐÃ KHỚP ĐƯỜNG DẪN) */}
+        <Route 
+          path="/favorites" 
+          element={
+             <CustomerLayoutWrapper>
+                <FavoriteProducts user={user} />
+             </CustomerLayoutWrapper>
+          } 
+        />
+
+        <Route 
+          path="/policy" 
+          element={
+             <CustomerLayoutWrapper>
+                <PrivacyPolicy />
+             </CustomerLayoutWrapper>
+          } 
+        />
+
+        <Route 
+          path="/terms" 
+          element={
+             <CustomerLayoutWrapper>
+                <TermsOfUse />
+             </CustomerLayoutWrapper>
+          } 
+        />
+
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+
       <CustomerOrderHistory user={user} open={showHistoryModal} onCancel={() => setShowHistoryModal(false)} />
-      {/* Removed BookingModal as we are using TableManagementPage now */}
-      {/* <BookingModal open={showBookingModal} onCancel={() => setShowBookingModal(false)} user={user} /> */} 
+      <ChatBot />
     </div>
   );
 }

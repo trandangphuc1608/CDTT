@@ -33,11 +33,11 @@ const ProfilePage = ({ user, onUserUpdated }) => {
 
         try {
             // Gọi API upload file riêng biệt
-            const res = await axios.post('http://localhost:8081/api/users/upload-avatar', formData, {
+            const res = await axios.post('/api/users/upload-avatar', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
 
-            // Server trả về đường dẫn ảnh (ví dụ: http://localhost:8081/images/abc.jpg)
+            // Server trả về đường dẫn ảnh (ví dụ: /images/abc.jpg)
             const newImageUrl = res.data;
             
             setAvatarUrl(newImageUrl); // Hiển thị ảnh ngay
@@ -61,7 +61,7 @@ const ProfilePage = ({ user, onUserUpdated }) => {
                 avatar: avatarUrl // Giờ đây avatar là một đường dẫn ngắn (URL), không phải Base64 dài
             };
 
-            const res = await axios.put(`http://localhost:8081/api/users/${user.id}`, updatedData);
+            const res = await axios.put(`/api/users/${user.id}`, updatedData);
 
             message.success("Cập nhật hồ sơ thành công!");
             onUserUpdated(res.data);

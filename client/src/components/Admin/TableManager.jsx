@@ -16,7 +16,7 @@ const TableManager = () => {
     const fetchTables = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:8081/api/tables');
+            const res = await axios.get('/api/tables');
             setTables(res.data);
         } catch (error) {
             message.error("Lỗi tải danh sách bàn!");
@@ -46,11 +46,11 @@ const TableManager = () => {
         try {
             if (editingTable) {
                 // Cập nhật
-                await axios.put(`http://localhost:8081/api/tables/${editingTable.id}`, values);
+                await axios.put(`/api/tables/${editingTable.id}`, values);
                 message.success("Cập nhật bàn thành công!");
             } else {
                 // Thêm mới
-                await axios.post('http://localhost:8081/api/tables', values);
+                await axios.post('/api/tables', values);
                 message.success("Thêm bàn mới thành công!");
             }
             setIsModalOpen(false);
@@ -63,7 +63,7 @@ const TableManager = () => {
     // Xóa bàn
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:8081/api/tables/${id}`);
+            await axios.delete(`/api/tables/${id}`);
             message.success("Đã xóa bàn!");
             fetchTables();
         } catch (error) {

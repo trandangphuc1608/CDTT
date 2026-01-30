@@ -1,36 +1,37 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Button, Row, Col, Typography, Card, Tabs, message, Spin } from 'antd';
-import ProductDetailModal from './ProductDetailModal';
+import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
 
 const { Title, Text } = Typography;
 
-const MenuPage = ({ user, onLogin, onOrder, searchText, initialCategoryId }) => { 
+// Đã bỏ props onOrder vì không cần xử lý thêm vào giỏ ở trang này nữa
+const MenuPage = ({ user, onLogin, searchText, initialCategoryId }) => { 
     const [categories, setCategories] = useState([]); 
     const [products, setProducts] = useState([]);     
     const [activeTab, setActiveTab] = useState('');   
     const [loading, setLoading] = useState(false);
+    
+    // 2. Khởi tạo navigate
+    const navigate = useNavigate();
 
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    const [showDetail, setShowDetail] = useState(false);
+    // 3. Đã XÓA các state và logic liên quan đến Modal (showDetail, selectedProduct...)
 
-    // --- THÊM ĐOẠN NÀY ĐỂ TỰ ĐỘNG CUỘN LÊN ĐẦU TRANG ---
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []); 
-    // -----------------------------------------------------
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
                 const [catRes, prodRes] = await Promise.all([
-                    axios.get('http://localhost:8081/api/categories'),
-                    axios.get('http://localhost:8081/api/products')
+                    axios.get('/api/categories'),
+                    axios.get('/api/products')
                 ]);
+                
                 setCategories(catRes.data);
                 
-                // Logic chọn tab
                 if (catRes.data.length > 0) {
                     if (initialCategoryId) {
                         setActiveTab(String(initialCategoryId));
@@ -42,6 +43,7 @@ const MenuPage = ({ user, onLogin, onOrder, searchText, initialCategoryId }) => 
                 setProducts(prodRes.data);
             } catch (error) { 
                 console.error("Lỗi tải thực đơn:", error); 
+                message.error("Không thể tải thực đơn lúc này.");
             } finally {
                 setLoading(false);
             }
@@ -49,18 +51,9 @@ const MenuPage = ({ user, onLogin, onOrder, searchText, initialCategoryId }) => 
         fetchData();
     }, [initialCategoryId]); 
 
+    // 4. Hàm chuyển trang sang chi tiết
     const handleProductClick = (product) => {
-        setSelectedProduct(product);
-        setShowDetail(true);
-    };
-
-    const handleAddToCartFromModal = (orderItem) => {
-        if (user) {
-            onOrder(); 
-        } else {
-            message.info("Vui lòng Đăng nhập để đặt món!");
-            onLogin();
-        }
+        navigate(`/product/${product.id}`);
     };
 
     const displayedProducts = products.filter(p => {
@@ -71,6 +64,8 @@ const MenuPage = ({ user, onLogin, onOrder, searchText, initialCategoryId }) => 
 
     return (
         <div style={{ padding: '20px 50px', background: '#fff', minHeight: '80vh' }}>
+            
+            {/* TIÊU ĐỀ */}
             <div style={{ textAlign: 'center', marginBottom: '30px' }}>
                 <Title level={2} style={{ color: '#1f2937', textTransform: 'uppercase' }}>
                     {searchText ? `Kết quả tìm kiếm: "${searchText}"` : "THỰC ĐƠN HÔM NAY"}
@@ -78,6 +73,7 @@ const MenuPage = ({ user, onLogin, onOrder, searchText, initialCategoryId }) => 
                 <div style={{ width: '60px', height: '3px', background: '#f5a623', margin: '10px auto' }}></div>
             </div>
 
+            {/* TABS DANH MỤC */}
             {!searchText && categories.length > 0 && (
                 <Tabs 
                     activeKey={activeTab} 
@@ -91,6 +87,7 @@ const MenuPage = ({ user, onLogin, onOrder, searchText, initialCategoryId }) => 
                 />
             )}
 
+            {/* LIST SẢN PHẨM */}
             {loading ? (
                 <div style={{ textAlign: 'center', padding: '50px' }}><Spin size="large" /></div>
             ) : (
@@ -99,19 +96,29 @@ const MenuPage = ({ user, onLogin, onOrder, searchText, initialCategoryId }) => 
                         <Col xs={24} sm={12} md={8} lg={6} key={item.id}>
                             <Card 
                                 hoverable 
-                                cover={<img alt={item.name} src={item.imageUrl || "https://placehold.co/300x200?text=No+Image"} style={{ height: '200px', objectFit: 'cover' }} />} 
+                                cover={
+                                    <img 
+                                        alt={item.name} 
+                                        src={item.imageUrl || item.image || "https://placehold.co/300x200?text=No+Image"} 
+                                        style={{ height: '200px', objectFit: 'cover' }} 
+                                    />
+                                } 
                                 bordered={false} 
                                 style={{ textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: '10px', overflow: 'hidden' }} 
+                                
+                                // Click vào Card thì chuyển trang
                                 onClick={() => handleProductClick(item)} 
                             >
                                 <Title level={5} style={{ margin: '10px 0', minHeight: '40px', fontSize: '16px' }}>{item.name}</Title>
-                                <Text strong style={{ fontSize: '18px', color: '#cf1322', display: 'block', marginBottom: '15px' }}>{item.price.toLocaleString()} ₫</Text>
+                                <Text strong style={{ fontSize: '18px', color: '#cf1322', display: 'block', marginBottom: '15px' }}>
+                                    {item.price.toLocaleString()} ₫
+                                </Text>
                                 <Button 
                                     type="primary" block 
                                     style={{ background: '#f5a623', borderColor: '#f5a623', fontWeight: 'bold' }} 
                                     onClick={(e) => { 
-                                        e.stopPropagation(); 
-                                        handleProductClick(item);
+                                        e.stopPropagation(); // Chặn sự kiện nổi bọt
+                                        handleProductClick(item); 
                                     }}
                                 >
                                     CHỌN MÓN
@@ -121,19 +128,14 @@ const MenuPage = ({ user, onLogin, onOrder, searchText, initialCategoryId }) => 
                     )) : (
                         <Col span={24} style={{ textAlign: 'center', padding: '50px' }}>
                             <Text type="secondary" style={{ fontSize: '18px' }}>
-                                {searchText ? `Không tìm thấy món nào tên "${searchText}"` : "Đang cập nhật thực đơn..."}
+                                {searchText ? `Không tìm thấy món nào tên "${searchText}"` : "Danh mục này chưa có món ăn."}
                             </Text>
                         </Col>
                     )}
                 </Row>
             )}
-
-            <ProductDetailModal 
-                open={showDetail} 
-                onCancel={() => setShowDetail(false)} 
-                product={selectedProduct}
-                onAddToCart={handleAddToCartFromModal}
-            />
+            
+            {/* Đã xóa <ProductDetailModal /> */}
         </div>
     );
 };

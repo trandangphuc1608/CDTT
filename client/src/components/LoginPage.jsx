@@ -7,43 +7,51 @@ const LoginPage = ({ onLogin, onGuest, onSwitchToRegister }) => {
     const [error, setError] = useState('');
 
     const handleLogin = async (e) => {
-    e.preventDefault();
-    try {
-        // Log để kiểm tra xem dữ liệu gửi đi là gì
-        console.log("Đang gửi đăng nhập:", { username, password }); 
-        
-        const res = await axios.post('http://localhost:8081/api/auth/login', {
-            username,
-            password
-        });
-        
-        console.log("Kết quả từ server:", res.data);
-        onLogin(res.data);
-    } catch (err) {
-        console.error("Lỗi chi tiết:", err); // Xem lỗi này trong F12 -> Console
+        if (e) e.preventDefault();
+        try {
+            console.log("Đang gửi đăng nhập:", { username, password });
+            
+            const res = await axios.post('/api/auth/login', {
+                username,
+                password
+            });
+            
+            console.log("Kết quả từ server:", res.data);
+            
+            // Lưu thông tin user vào LocalStorage để POSPage đọc được
+            localStorage.setItem("fastfood_user", JSON.stringify(res.data));
 
-        if (err.code === "ERR_NETWORK") {
-            setError("❌ Lỗi kết nối! Backend chưa chạy hoặc sai Port.");
-        } else if (err.response) {
-            // Lỗi do server trả về (VD: 401 Sai mật khẩu)
-            setError(`❌ Server báo: ${err.response.data || "Sai thông tin"}`);
-        } else {
-            setError("❌ Lỗi không xác định: " + err.message);
+            onLogin(res.data);
+        } catch (err) {
+            console.error("Lỗi chi tiết:", err);
+
+            if (err.code === "ERR_NETWORK") {
+                setError("❌ Lỗi kết nối! Backend chưa chạy hoặc sai Port.");
+            } else if (err.response) {
+                setError(`❌ Server báo: ${err.response.data || "Sai thông tin"}`);
+            } else {
+                setError("❌ Lỗi không xác định: " + err.message);
+            }
         }
-    }
-};
+    };
+
+    // --- HÀM MỚI: Tự động điền tài khoản khi click ---
+    const fillAccount = (u, p) => {
+        setUsername(u);
+        setPassword(p);
+        setError(''); // Xóa lỗi cũ nếu có
+    };
 
     return (
-        // Container chính: dùng position: fixed để phủ kín màn hình
         <div 
             className="d-flex justify-content-center align-items-center bg-light"
             style={{
-                position: 'fixed',   // Ghim cố định
+                position: 'fixed',
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: '100vh',     // Full chiều cao màn hình
-                zIndex: 9999         // Đảm bảo nổi lên trên cùng
+                height: '100vh',
+                zIndex: 9999
             }}
         >
             <div className="card shadow-lg p-4 border-0" style={{ width: '400px', maxWidth: '90%', borderRadius: '15px' }}>
@@ -84,7 +92,6 @@ const LoginPage = ({ onLogin, onGuest, onSwitchToRegister }) => {
                         ĐĂNG NHẬP
                     </button>
                     
-                    {/* --- DÒNG ĐĂNG KÝ MỚI THÊM --- */}
                     <div className="text-center mb-3">
                         <span className="text-muted small">Chưa có tài khoản? </span>
                         <a 
@@ -108,16 +115,53 @@ const LoginPage = ({ onLogin, onGuest, onSwitchToRegister }) => {
                     🛍️ Tiếp tục với tư cách Khách
                 </button>
                 
-                {/* Gợi ý tài khoản để test nhanh */}
-                <div className="mt-4 pt-3 border-top text-center text-muted" style={{fontSize: '0.8rem'}}>
+                {/* --- KHU VỰC CHỌN TÀI KHOẢN NHANH --- */}
+                <div className="mt-4 pt-3 border-top text-center text-muted" style={{fontSize: '0.85rem'}}>
+                    <p className="mb-2 fst-italic text-secondary">👇 Nhấn vào tài khoản bên dưới để điền nhanh:</p>
                     <div className="row">
                         <div className="col-6 text-start ps-4">
-                            <div>👮 <b>Admin:</b> admin/123</div>
-                            <div>👩‍🍳 <b>Bếp:</b> bep1/123</div>
+                            <div 
+                                className="mb-2 p-1 rounded text-hover-danger"
+                                style={{cursor: 'pointer', transition: 'background 0.2s'}}
+                                onClick={() => fillAccount('admin', '123')}
+                                title="Click để chọn Admin"
+                                onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                                👮 <b>Admin:</b> admin/123
+                            </div>
+                            <div 
+                                className="mb-2 p-1 rounded"
+                                style={{cursor: 'pointer', transition: 'background 0.2s'}}
+                                onClick={() => fillAccount('bep1', '123')}
+                                title="Click để chọn Bếp"
+                                onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                                👩‍🍳 <b>Bếp:</b> bep1/123
+                            </div>
                         </div>
                         <div className="col-6 text-start">
-                            <div>👩‍💼 <b>Thu ngân:</b> tn1/123</div>
-                            <div>👤 <b>Khách:</b> kh1/123</div>
+                            <div 
+                                className="mb-2 p-1 rounded"
+                                style={{cursor: 'pointer', transition: 'background 0.2s'}}
+                                onClick={() => fillAccount('tn1', '123')}
+                                title="Click để chọn Thu Ngân"
+                                onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                                👩‍💼 <b>Thu ngân:</b> tn1/123
+                            </div>
+                            <div 
+                                className="mb-2 p-1 rounded"
+                                style={{cursor: 'pointer', transition: 'background 0.2s'}}
+                                onClick={() => fillAccount('kh1', '123')}
+                                title="Click để chọn Khách"
+                                onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                                👤 <b>Khách:</b> kh1/123
+                            </div>
                         </div>
                     </div>
                 </div>

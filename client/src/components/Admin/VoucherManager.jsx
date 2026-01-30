@@ -17,7 +17,7 @@ const VoucherManager = () => {
     const fetchVouchers = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:8081/api/vouchers');
+            const res = await axios.get('/api/vouchers');
             setVouchers(res.data);
         } catch (error) {
             message.error('Lỗi tải dữ liệu!');
@@ -35,11 +35,11 @@ const VoucherManager = () => {
         try {
             if (editingVoucher) {
                 // --- TRƯỜNG HỢP SỬA ---
-                await axios.put(`http://localhost:8081/api/vouchers/${editingVoucher.id}`, values);
+                await axios.put(`/api/vouchers/${editingVoucher.id}`, values);
                 message.success('Cập nhật mã thành công!');
             } else {
                 // --- TRƯỜNG HỢP THÊM MỚI ---
-                await axios.post('http://localhost:8081/api/vouchers', values);
+                await axios.post('/api/vouchers', values);
                 message.success('Tạo mã mới thành công!');
             }
             
@@ -53,7 +53,7 @@ const VoucherManager = () => {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:8081/api/vouchers/${id}`);
+            await axios.delete(`/api/vouchers/${id}`);
             message.success('Đã xóa!');
             fetchVouchers();
         } catch (error) {

@@ -27,9 +27,9 @@ const TableManagementPage = ({ onGoHome, user, onLogout }) => {
     const fetchData = async () => {
         try {
             const [tableRes, prodRes, catRes] = await Promise.all([
-                axios.get("http://localhost:8081/api/tables"), 
-                axios.get("http://localhost:8081/api/products"),
-                axios.get("http://localhost:8081/api/categories")
+                axios.get("/api/tables"), 
+                axios.get("/api/products"),
+                axios.get("/api/categories")
             ]);
             setTables(tableRes.data);
             setProducts(prodRes.data);

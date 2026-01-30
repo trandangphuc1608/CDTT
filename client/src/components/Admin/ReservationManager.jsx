@@ -12,7 +12,7 @@ const ReservationManager = () => {
     const fetchReservations = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:8081/api/reservations');
+            const res = await axios.get('/api/reservations');
             // Sắp xếp đơn mới nhất lên đầu
             const sortedData = res.data.sort((a, b) => new Date(b.bookingTime) - new Date(a.bookingTime));
             setReservations(sortedData);
@@ -30,7 +30,7 @@ const ReservationManager = () => {
     // Xử lý đổi trạng thái
     const handleUpdateStatus = async (id, status) => {
         try {
-            await axios.put(`http://localhost:8081/api/reservations/${id}/status?status=${status}`);
+            await axios.put(`/api/reservations/${id}/status?status=${status}`);
             message.success(status === 'CONFIRMED' ? 'Đã xác nhận!' : 'Đã hủy đơn!');
             fetchReservations(); // Load lại bảng
         } catch (error) {
