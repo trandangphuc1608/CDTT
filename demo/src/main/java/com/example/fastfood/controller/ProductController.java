@@ -1,16 +1,11 @@
 package com.example.fastfood.controller;
 
-import com.example.fastfood.entity.Product;
-import com.example.fastfood.entity.ProductIngredient;
-import com.example.fastfood.entity.Ingredient;
-import com.example.fastfood.repository.ProductRepository;
-import com.example.fastfood.repository.ProductIngredientRepository;
-import com.example.fastfood.repository.IngredientRepository;
-
-import jakarta.transaction.Transactional; // Import Transactional cho việc lưu công thức
-
+import com.example.fastfood.entity.*;
+import com.example.fastfood.repository.*;
+import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,9 +13,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.Map; // <--- ĐÂY LÀ THƯ VIỆN BẠN ĐANG THIẾU
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -32,101 +26,158 @@ public class ProductController {
     private ProductRepository productRepository;
 
     @Autowired
-    private ProductIngredientRepository productIngredientRepository;
+    private CategoryRepository categoryRepository; // Cần cái này để tìm danh mục
 
     @Autowired
     private IngredientRepository ingredientRepository;
 
-    // Đường dẫn lưu ảnh (Bạn có thể cấu hình trong application.properties)
-    private final String UPLOAD_DIR = "uploads/";
+    @Autowired
+    private ProductIngredientRepository productIngredientRepository;
 
+    // --- DTO: Class phụ để hứng dữ liệu từ React gửi lên ---
+    @Data
+    public static class ProductRequest {
+        private String name;
+        private Double price;
+        private String description;
+        private String imageUrl;
+        private Long categoryId; // React gửi categoryId (số)
+        private Boolean isAvailable;
+    }
+
+    // 1. Lấy danh sách món ăn
     @GetMapping
     public List<Product> getAllProducts() {
         return productRepository.findAll();
     }
 
-    @PostMapping
-    public Product createProduct(@RequestBody Product product) {
-        return productRepository.save(product);
-    }
-
+    // 2. Lấy chi tiết 1 món ăn
     @GetMapping("/{id}")
-    public Product getProductById(@PathVariable Long id) {
-        return productRepository.findById(id).orElse(null);
+    public ResponseEntity<Product> getProduct(@PathVariable Long id) {
+        return productRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
+    // 3. THÊM MÓN ĂN (Đã sửa để nhận categoryId)
+    @PostMapping
+    public ResponseEntity<?> createProduct(@RequestBody ProductRequest request) {
+        Product p = new Product();
+        p.setName(request.getName());
+        p.setPrice(request.getPrice());
+        p.setDescription(request.getDescription());
+        p.setImageUrl(request.getImageUrl());
+        p.setIsAvailable(request.getIsAvailable() != null ? request.getIsAvailable() : true);
+
+        // Xử lý Category
+        if (request.getCategoryId() != null) {
+            Category c = categoryRepository.findById(request.getCategoryId()).orElse(null);
+            p.setCategory(c);
+        }
+
+        return ResponseEntity.ok(productRepository.save(p));
+    }
+
+    // 4. SỬA MÓN ĂN (Thêm hàm này)
     @PutMapping("/{id}")
-    public Product updateProduct(@PathVariable Long id, @RequestBody Product productDetails) {
-        Product product = productRepository.findById(id).orElseThrow();
+    public ResponseEntity<?> updateProduct(@PathVariable Long id, @RequestBody ProductRequest request) {
+        Product p = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy món ID: " + id));
+
+        p.setName(request.getName());
+        p.setPrice(request.getPrice());
+        p.setDescription(request.getDescription());
+        p.setImageUrl(request.getImageUrl());
         
-        product.setName(productDetails.getName());
-        product.setPrice(productDetails.getPrice());
-        product.setDescription(productDetails.getDescription());
-        product.setImageUrl(productDetails.getImageUrl());
-        product.setCategory(productDetails.getCategory());
-        product.setIsAvailable(productDetails.getIsAvailable());
+        if (request.getIsAvailable() != null) {
+            p.setIsAvailable(request.getIsAvailable());
+        }
 
-        return productRepository.save(product);
+        // Cập nhật Category nếu có thay đổi
+        if (request.getCategoryId() != null) {
+            Category c = categoryRepository.findById(request.getCategoryId()).orElse(null);
+            p.setCategory(c);
+        }
+
+        return ResponseEntity.ok(productRepository.save(p));
     }
 
+    // 5. XÓA MÓN ĂN (Thêm hàm này)
     @DeleteMapping("/{id}")
-    public void deleteProduct(@PathVariable Long id) {
-        productRepository.deleteById(id);
+    public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
+        if (!productRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        try {
+            productRepository.deleteById(id);
+            return ResponseEntity.ok("Đã xóa thành công!");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Không thể xóa món này (do đã có đơn hàng hoặc công thức liên quan)");
+        }
     }
 
-    // --- API UPLOAD ẢNH ---
+    // 6. Upload ảnh món ăn
     @PostMapping("/upload")
     public String uploadImage(@RequestParam("file") MultipartFile file) throws IOException {
-        // Tạo thư mục nếu chưa có
-        Path uploadPath = Paths.get(UPLOAD_DIR);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
+        String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+        Path path = Paths.get("uploads/");
+        if (!Files.exists(path)) {
+            Files.createDirectories(path);
         }
-
-        // Tạo tên file ngẫu nhiên để tránh trùng
-        String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
-        Path filePath = uploadPath.resolve(fileName);
-        
-        // Lưu file
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-        // Trả về URL (Giả sử bạn đã cấu hình static resource handler)
-        // Trong môi trường dev đơn giản, trả về đường dẫn tương đối
-        return "http://localhost:8081/uploads/" + fileName; 
+        Files.copy(file.getInputStream(), path.resolve(fileName));
+        return "/uploads/" + fileName;
     }
 
-    // --- CÁC API VỀ CÔNG THỨC (RECIPE) ---
-
-    // API Lấy công thức của 1 món
-    @GetMapping("/{id}/ingredients")
-    public List<ProductIngredient> getIngredients(@PathVariable Long id) {
-        return productIngredientRepository.findByProductId(id);
-    }
-
-    // API Cập nhật công thức cho món ăn
-    @PostMapping("/{id}/ingredients")
+    // ==========================================
+    // CÁC HÀM XỬ LÝ CÔNG THỨC (GIỮ NGUYÊN)
+    // ==========================================
+    
+    @PostMapping("/{productId}/ingredients")
     @Transactional
-    public ResponseEntity<?> updateRecipe(@PathVariable Long id, @RequestBody List<Map<String, Object>> ingredientsData) {
-        Product product = productRepository.findById(id).orElseThrow();
+    public ResponseEntity<?> addIngredientToProduct(
+            @PathVariable Long productId,
+            @RequestBody Map<String, Object> payload
+    ) {
+        try {
+            Long ingredientId = Long.valueOf(payload.get("ingredientId").toString());
+            Double quantity = Double.valueOf(payload.get("quantity").toString());
 
-        // 1. Xóa công thức cũ
-        productIngredientRepository.deleteByProductId(id);
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new RuntimeException("Món ăn không tồn tại"));
 
-        // 2. Thêm công thức mới
-        for (Map<String, Object> item : ingredientsData) {
-            // Ép kiểu dữ liệu từ JSON gửi lên
-            Long ingredientId = Long.valueOf(item.get("ingredientId").toString());
-            Double quantity = Double.valueOf(item.get("quantity").toString());
+            Ingredient ingredient = ingredientRepository.findById(ingredientId)
+                    .orElseThrow(() -> new RuntimeException("Nguyên liệu không tồn tại"));
 
-            Ingredient ingredient = ingredientRepository.findById(ingredientId).orElseThrow();
+            // Kiểm tra xem đã có nguyên liệu này trong món chưa, nếu có thì update
+            ProductIngredient link = productIngredientRepository.findByProduct_Id(productId).stream()
+                    .filter(pi -> pi.getIngredient().getId().equals(ingredientId))
+                    .findFirst()
+                    .orElse(new ProductIngredient());
 
-            ProductIngredient pi = new ProductIngredient();
-            pi.setProduct(product);
-            pi.setIngredient(ingredient);
-            pi.setQuantityNeeded(quantity);
-            
-            productIngredientRepository.save(pi);
+            link.setProduct(product);
+            link.setIngredient(ingredient);
+            link.setQuantityNeeded(quantity);
+
+            productIngredientRepository.save(link);
+
+            return ResponseEntity.ok("Đã cập nhật công thức!");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Lỗi: " + e.getMessage());
         }
-        return ResponseEntity.ok("Cập nhật công thức thành công!");
+    }
+
+    @DeleteMapping("/{productId}/ingredients/{ingredientId}")
+    @Transactional
+    public ResponseEntity<?> removeIngredientFromProduct(@PathVariable Long productId, @PathVariable Long ingredientId) {
+        List<ProductIngredient> list = productIngredientRepository.findByProduct_Id(productId);
+        for (ProductIngredient pi : list) {
+            if (pi.getIngredient().getId().equals(ingredientId)) {
+                productIngredientRepository.delete(pi);
+                return ResponseEntity.ok("Đã xóa nguyên liệu khỏi công thức");
+            }
+        }
+        return ResponseEntity.badRequest().body("Không tìm thấy nguyên liệu trong món này");
     }
 }

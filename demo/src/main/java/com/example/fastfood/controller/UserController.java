@@ -80,7 +80,7 @@ public class UserController {
             Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
             
             // Trả về đường dẫn HTTP
-            return "http://localhost:8081/images/" + fileName; 
+            return "/images/" + fileName; 
         } catch (IOException e) {
             e.printStackTrace();
             return "Lỗi upload: " + e.getMessage();

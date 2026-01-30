@@ -10,20 +10,7 @@ public class DiningTable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false)
-    private String name; // VD: Bàn 1, Bàn 2
-
-    private Integer capacity; // Số ghế (VD: 4, 6)
-
-    // AVAILABLE (Trống), BOOKED (Đã đặt), OCCUPIED (Đang dùng)
-    private String status = "AVAILABLE"; 
-    
-    public DiningTable() {}
-    
-    public DiningTable(String name, Integer capacity, String status) {
-        this.name = name;
-        this.capacity = capacity;
-        this.status = status;
-    }
+    private String name;    // Ví dụ: Bàn 1
+    private Integer capacity; // Số ghế: 4
+    private String status;  // AVAILABLE, OCCUPIED
 }

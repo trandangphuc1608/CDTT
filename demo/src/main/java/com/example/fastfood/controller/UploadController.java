@@ -43,7 +43,7 @@ public class UploadController {
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
             // Trả về đường dẫn ảnh
-            String fileUrl = "http://localhost:8081/api/upload/files/" + fileName;
+            String fileUrl = "/api/upload/files/" + fileName;
             
             Map<String, String> response = new HashMap<>();
             response.put("url", fileUrl);

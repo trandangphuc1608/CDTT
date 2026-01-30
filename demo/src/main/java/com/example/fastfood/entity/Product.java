@@ -1,36 +1,36 @@
 package com.example.fastfood.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import java.math.BigDecimal;
+import lombok.Data;
 import java.util.List;
 
 @Entity
 @Table(name = "products")
-@Getter
-@Setter
+@Data
 public class Product {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
     private String name;
 
+    private Double price;
+
     private String description;
-
-    @Column(nullable = false)
-    private BigDecimal price;
-
+    
+    @Column(name = "image_url")
     private String imageUrl;
-
-    private Boolean isAvailable = true;
+    
+    // Thêm trường trạng thái để quản lý Bật/Tắt món
+    private Boolean isAvailable;
 
     @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
-    private List<ProductIngredient> ingredients;
+    // 👇 QUAN TRỌNG: fetch = EAGER để luôn tải danh sách công thức
+    // mappedBy = "product" phải khớp với biến 'product' trong ProductIngredient.java
+    @OneToMany(mappedBy = "product", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    private List<ProductIngredient> productIngredients;
 }

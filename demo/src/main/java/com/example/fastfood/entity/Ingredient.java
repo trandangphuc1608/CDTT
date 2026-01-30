@@ -1,33 +1,27 @@
 package com.example.fastfood.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor; // Thêm dòng này
 import lombok.Data;
+import lombok.NoArgsConstructor; // Thêm dòng này
 
 @Entity
 @Table(name = "ingredients")
 @Data
+@AllArgsConstructor // 👇 Tự động tạo constructor đầy đủ tham số
+@NoArgsConstructor  // 👇 Tự động tạo constructor rỗng
 public class Ingredient {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String name; // Tên nguyên liệu (VD: Thịt bò, Bột mì)
+    private String name;
 
-    private String unit; // Đơn vị tính (VD: kg, lít, cái)
+    private Double quantity;
 
-    private Double quantity; // Số lượng tồn kho
+    private String unit;
 
-    private Double minLimit; // Mức cảnh báo (Nếu tồn kho < mức này sẽ báo đỏ)
-    
-    // Constructor mặc định
-    public Ingredient() {}
-
-    // Constructor có tham số để tạo nhanh
-    public Ingredient(String name, String unit, Double quantity, Double minLimit) {
-        this.name = name;
-        this.unit = unit;
-        this.quantity = quantity;
-        this.minLimit = minLimit;
-    }
+    @Column(name = "min_threshold")
+    private Double minThreshold = 5.0; 
 }

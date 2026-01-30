@@ -1,6 +1,6 @@
 package com.example.fastfood.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnore; // Import thư viện này
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -8,20 +8,23 @@ import lombok.Data;
 @Table(name = "product_ingredients")
 @Data
 public class ProductIngredient {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Liên kết với Món ăn (VD: Burger)
+    @Column(name = "quantity_needed")
+    private Double quantityNeeded;
+
+    // 👇 CÁI NÀY PHẢI CÓ @JsonIgnore (Để tránh vòng lặp)
     @ManyToOne
     @JoinColumn(name = "product_id")
-    @JsonIgnore // Tránh vòng lặp
+    @JsonIgnore 
     private Product product;
 
-    // Liên kết với Nguyên liệu (VD: Thịt bò)
+    // 👇 CÁI NÀY TUYỆT ĐỐI "KHÔNG" ĐƯỢC CÓ @JsonIgnore
+    // Nếu bạn lỡ tay thêm @JsonIgnore vào đây thì tên nguyên liệu sẽ bị mất
     @ManyToOne
     @JoinColumn(name = "ingredient_id")
-    private Ingredient ingredient;
-
-    private Double quantityNeeded; // Số lượng cần (VD: 0.1 kg)
+    private Ingredient ingredient; 
 }

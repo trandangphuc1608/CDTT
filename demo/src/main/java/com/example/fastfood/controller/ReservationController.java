@@ -1,54 +1,51 @@
 package com.example.fastfood.controller;
 
 import com.example.fastfood.entity.Reservation;
-import com.example.fastfood.entity.User;
 import com.example.fastfood.repository.ReservationRepository;
-import com.example.fastfood.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@CrossOrigin(origins = "*") // Cho phép React gọi API
 @RestController
 @RequestMapping("/api/reservations")
-@CrossOrigin(origins = "*")
 public class ReservationController {
 
     @Autowired
     private ReservationRepository reservationRepository;
 
-    @Autowired
-    private UserRepository userRepository;
-
-    // API Khách đặt bàn
-    @PostMapping
-    public Reservation createReservation(@RequestBody Reservation reservation, @RequestParam(required = false) Long userId) {
-        if (userId != null) {
-            User user = userRepository.findById(userId).orElse(null);
-            reservation.setUser(user);
-        }
-        return reservationRepository.save(reservation);
-    }
-
-    // API Lấy danh sách đặt bàn của user
-    @GetMapping("/my-reservations/{userId}")
-    public List<Reservation> getMyReservations(@PathVariable Long userId) {
-        return reservationRepository.findByUserIdOrderByBookingTimeDesc(userId);
-    }
-    
-    // API Lấy tất cả (Dành cho Admin sau này)
+    // 1. Lấy danh sách đặt bàn (Sắp xếp mới nhất lên đầu)
     @GetMapping
-    public List<Reservation> getAll() {
-        return reservationRepository.findAll();
+    public List<Reservation> getAllReservations() {
+        return reservationRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "reservationTime"));
     }
 
-    @PutMapping("/{id}/status")
-    public Reservation updateStatus(@PathVariable Long id, @RequestParam String status) {
-        Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt bàn!"));
-        
-        reservation.setStatus(status);
+    // 2. Tạo đơn đặt bàn mới (Khách hàng gửi lên)
+    @PostMapping
+    public Reservation createReservation(@RequestBody Reservation reservation) {
+        // Mặc định trạng thái là PENDING (Chờ xác nhận)
+        reservation.setStatus("PENDING");
         return reservationRepository.save(reservation);
+    }
+
+    // 3. Cập nhật trạng thái (Admin xác nhận hoặc hủy)
+    @PutMapping("/{id}")
+    public ResponseEntity<Reservation> updateStatus(@PathVariable Long id, @RequestBody Reservation details) {
+        return reservationRepository.findById(id).map(reservation -> {
+            // Chỉ cho phép sửa trạng thái và ghi chú
+            if (details.getStatus() != null) reservation.setStatus(details.getStatus());
+            if (details.getNote() != null) reservation.setNote(details.getNote());
+            
+            return ResponseEntity.ok(reservationRepository.save(reservation));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // 4. Xóa đơn đặt bàn
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteReservation(@PathVariable Long id) {
+        reservationRepository.deleteById(id);
+        return ResponseEntity.ok().build();
     }
 }

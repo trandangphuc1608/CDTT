@@ -7,6 +7,7 @@ import java.util.List;
 
 @Repository
 public interface ProductIngredientRepository extends JpaRepository<ProductIngredient, Long> {
-    List<ProductIngredient> findByProductId(Long productId);
-    void deleteByProductId(Long productId); // Dùng để reset công thức cũ khi cập nhật
+    
+    // 👇 PHẢI VIẾT Y HỆT NHƯ THẾ NÀY (Có dấu gạch dưới _Id)
+    List<ProductIngredient> findByProduct_Id(Long productId);
 }

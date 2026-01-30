@@ -1,7 +1,8 @@
 package com.example.fastfood.entity;
 
-import jakarta.persistence.*; // Spring Boot 3 dùng jakarta.persistence
-// Nếu bạn dùng Spring Boot 2 thì đổi thành javax.persistence
+import com.fasterxml.jackson.annotation.JsonIgnore; // Import thư viện này để tránh lỗi lặp JSON
+import jakarta.persistence.*;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -16,12 +17,17 @@ public class User {
     private String fullName;
     private String role; // ADMIN, CASHIER, KITCHEN, CUSTOMER
 
-    // --- CÁC TRƯỜNG MỚI THÊM ---
     private String email;
 
-    @Lob // Báo hiệu đây là dữ liệu lớn
-    @Column(columnDefinition = "TEXT") // Hoặc LONGTEXT để lưu chuỗi Base64 dài hoặc URL dài
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String avatar;
+
+    // 👇👇👇 THÊM MỚI: Mối quan hệ với bảng Order 👇👇👇
+    // mappedBy = "user": Tên biến "user" bên file Order.java
+    @OneToMany(mappedBy = "user") 
+    @JsonIgnore // Quan trọng: Ngắt vòng lặp JSON khi lấy thông tin User
+    private List<Order> orders;
 
     // --- CONSTRUCTOR ---
     public User() {
@@ -36,7 +42,7 @@ public class User {
         this.avatar = avatar;
     }
 
-    // --- GETTERS AND SETTERS (BẮT BUỘC PHẢI CÓ) ---
+    // --- GETTERS AND SETTERS ---
 
     public Long getId() {
         return id;
@@ -78,7 +84,6 @@ public class User {
         this.role = role;
     }
 
-    // --- GETTER/SETTER CHO EMAIL & AVATAR ---
     public String getEmail() {
         return email;
     }
@@ -93,5 +98,14 @@ public class User {
 
     public void setAvatar(String avatar) {
         this.avatar = avatar;
+    }
+
+    // Getter & Setter cho danh sách Orders
+    public List<Order> getOrders() {
+        return orders;
+    }
+
+    public void setOrders(List<Order> orders) {
+        this.orders = orders;
     }
 }
